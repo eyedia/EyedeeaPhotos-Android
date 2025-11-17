@@ -3,6 +3,9 @@ package com.eyediatech.eyedeeaphotos
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
@@ -13,10 +16,14 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.Toast
+import android.os.PowerManager
+import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.util.Log
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,14 +31,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sharedPreferences: SharedPreferences
     private val STORAGE_PERMISSION_CODE = 1001
 
+    // Add these two lines with your other variable declarations
+//    private lateinit var powerManager: PowerManager
+//    private lateinit var wakeLock: PowerManager.WakeLock
+
     companion object {
         private const val PREFS_NAME = "EyeDeeaPrefs"
         private const val IP_KEY = "server_ip"
-        private const val DEFAULT_IP = "192.168.1.100:8080"
+        private const val DEFAULT_IP = "192.168.86.101"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Initialize shared preferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -41,6 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         // Setup WebView
         setupWebView(savedIp)
+
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -53,8 +67,7 @@ class MainActivity : AppCompatActivity() {
         webSettings.domStorageEnabled = true
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
-        webSettings.allowUniversalAccessFromFileURLs = true
-        webSettings.allowFileAccessFromFileURLs = true
+        webSettings.mediaPlaybackRequiresUserGesture = false
 
         // Enable downloads
         webSettings.setSupportMultipleWindows(true)
@@ -63,6 +76,9 @@ class MainActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             webSettings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
+
+        // Enable maximum performance
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         // Set up download listener
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
@@ -86,10 +102,21 @@ class MainActivity : AppCompatActivity() {
                 return false
             }
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // Also inject early for maximum protection
+                Handler(Looper.getMainLooper()).postDelayed({
+                    injectSimpleKeepAwake()
+                }, 2000)
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                injectKeepAwakeScript()
                 // Inject JavaScript to intercept download button clicks
                 injectDownloadInterceptor()
+                injectSimpleKeepAwake()
+
             }
 
             override fun onReceivedError(
@@ -356,6 +383,113 @@ class MainActivity : AppCompatActivity() {
 
         webView.loadDataWithBaseURL(null, errorHtml, "text/html", "UTF-8", null)
     }
+
+    private fun injectSimpleKeepAwake() {
+        val simpleScript = """
+        (function() {
+            console.log('Starting simple keep-awake...');
+            
+            // Simple animation element
+            const keepAliveDiv = document.createElement('div');
+            keepAliveDiv.style.cssText = 
+                'position: fixed; top: 0; left: 0; width: 1px; height: 1px; ' +
+                'background: transparent; z-index: 999999; pointer-events: none;';
+            document.body.appendChild(keepAliveDiv);
+            
+            // Simple animation every 30 seconds
+            let counter = 0;
+            setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    // Very subtle animation
+                    keepAliveDiv.style.transform = counter % 2 === 0 ? 
+                        'translateX(1px)' : 'translateX(0px)';
+                    console.log('Keep-alive pulse: ' + new Date().toLocaleTimeString());
+                    counter++;
+                }
+            }, 30000);
+            
+            // Handle visibility changes
+            document.addEventListener('visibilitychange', function() {
+                console.log('Visibility changed to: ' + document.visibilityState);
+                if (document.visibilityState === 'visible') {
+                    // Force a small activity
+                    window.dispatchEvent(new Event('resize'));
+                }
+            });
+            
+            console.log('Simple keep-awake activated');
+        })();
+    """.trimIndent()
+
+        try {
+            webView.evaluateJavascript(simpleScript, null)
+            Log.d("JavaScript", "Keep-awake script injected successfully")
+        } catch (e: Exception) {
+            Log.e("JavaScript", "Failed to inject script: ${e.message}")
+        }
+    }
+
+
+
+    private fun injectKeepAwakeScript() {
+        val keepAwakeScript = """
+        // Prevent screen timeout and blank screen
+        console.log('Injecting keep-awake script...');
+        
+        // Method 1: Simulate user activity every 20 seconds
+        setInterval(function() {
+            if (document.visibilityState === 'visible') {
+                // Simulate mouse movement
+                window.dispatchEvent(new MouseEvent('mousemove', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                }));
+                
+                // Simulate touch event
+                window.dispatchEvent(new TouchEvent('touchstart', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                }));
+                
+                console.log('Simulated user activity');
+            }
+        }, 20000);
+        
+        // Method 2: Wake Lock API (if supported)
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock activated');
+                    
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock was released');
+                    });
+                }
+            } catch (err) {
+                console.log('Wake Lock error:', err.message);
+            }
+        }
+        
+        // Request wake lock when page becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+        
+        // Initial request
+        requestWakeLock();
+        
+    """.trimIndent()
+
+        webView.evaluateJavascript(keepAwakeScript, null)
+    }
+
+
 
     // Handle permission results
     override fun onRequestPermissionsResult(
