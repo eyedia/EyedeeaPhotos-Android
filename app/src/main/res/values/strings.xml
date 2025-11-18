@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Eyedeea Photos</string>
+    <string name="cast_button">Cast</string>
+    <string name="settings">Settings</string>
 </resources>

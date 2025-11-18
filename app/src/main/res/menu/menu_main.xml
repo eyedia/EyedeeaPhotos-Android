@@ -5,14 +5,14 @@
     <!-- Cast Button -->
     <item
         android:id="@+id/media_route_menu_item"
-        android:title="Cast"
+        android:title="@string/cast_button"
         app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"
         app:showAsAction="always" />
 
     <!-- Settings -->
     <item
         android:id="@+id/action_settings"
-        android:title="Settings"
+        android:title="@string/settings"
         app:showAsAction="never" />
 
 </menu>

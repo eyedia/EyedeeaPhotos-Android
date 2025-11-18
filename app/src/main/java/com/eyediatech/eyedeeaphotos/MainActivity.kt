@@ -1,10 +1,13 @@
 package com.eyediatech.eyedeeaphotos
+import androidx.mediarouter.app.MediaRouteButton
 import android.os.Bundle
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.util.Log
+import android.view.Menu
+import com.google.android.gms.cast.framework.CastButtonFactory
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.cast.framework.CastContext
@@ -17,6 +20,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var castContext: CastContext
+    private lateinit var mediaRouteButton: MediaRouteButton
     private lateinit var webView: WebView
     private lateinit var menuButton: ImageButton
 
@@ -51,6 +55,8 @@ class MainActivity : AppCompatActivity() {
             }
             webView.webViewClient = WebViewClient()
 
+            initializeCastContext()
+
             Log.d("MainActivity", "Setting up menu button...")
             menuButton = findViewById(R.id.menu_button)
             if (menuButton == null) {
@@ -82,6 +88,45 @@ class MainActivity : AppCompatActivity() {
             Log.e("MainActivity", "CRASH in onCreate: ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    private fun initializeCastContext() {
+        GlobalScope.launch(Dispatchers.Main) {
+            try {
+                // Try to initialize Cast context
+                castContext = CastContext.getSharedInstance(this@MainActivity)
+                Log.d("MainActivity", "✅ Cast context initialized successfully")
+            } catch (e: Exception) {
+                Log.w("MainActivity", "⚠️ Cast not available: ${e.message}")
+                // Cast framework not available or not initialized
+                // App will still work without Cast
+            }
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+
+        try {
+            // Setup Cast button with CastButtonFactory
+            val mediaRouteMenuItem = menu?.findItem(R.id.media_route_menu_item)
+            if (mediaRouteMenuItem != null) {
+                val mediaRouteButton = mediaRouteMenuItem.actionView as? MediaRouteButton
+                if (mediaRouteButton != null) {
+                    CastButtonFactory.setUpMediaRouteButton(
+                        this,
+                        mediaRouteButton
+                    )
+                    Log.d("MainActivity", "✅ Cast button setup complete")
+                } else {
+                    Log.w("MainActivity", "⚠️ MediaRouteButton not found in menu item")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error setting up Cast button: ${e.message}")
+        }
+
+        return true
     }
 
     override fun onResume() {
