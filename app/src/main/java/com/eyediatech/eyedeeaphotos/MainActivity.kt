@@ -5,6 +5,7 @@ import android.webkit.WebViewClient
 import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.util.Log
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.SessionManagerListener
@@ -28,6 +29,14 @@ class MainActivity : AppCompatActivity() {
 
             Log.d("MainActivity", "Hiding action bar...")
             supportActionBar?.hide()
+
+            // Check if user enabled "Keep Screen On"
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            val keepScreenOn = prefs.getBoolean("keep_screen_on", true)
+
+            if (keepScreenOn) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
 
             Log.d("MainActivity", "Setting up WebView...")
             webView = findViewById(R.id.webview)
