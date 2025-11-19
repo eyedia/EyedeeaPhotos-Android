@@ -1,12 +1,14 @@
 package com.eyediatech.eyedeeaphotos
 import androidx.mediarouter.app.MediaRouteButton
 import android.os.Bundle
+import android.os.DeadObjectException
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
 import android.widget.PopupMenu
 import android.util.Log
 import android.view.Menu
+import android.view.MenuInflater
 import com.google.android.gms.cast.framework.CastButtonFactory
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +18,13 @@ import com.google.android.gms.cast.framework.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import android.os.Handler
+import android.os.Looper
+import androidx.lifecycle.lifecycleScope
+import java.util.concurrent.Executor
+import android.view.MenuItem
+
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,106 +37,119 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         try {
+            // 1. Set content view
             Log.d("MainActivity", "Setting content view...")
             setContentView(R.layout.activity_main)
 
-            Log.d("MainActivity", "Hiding action bar...")
-            supportActionBar?.hide()
+            // 3. Configure screen settings
+            configureScreenSettings()
 
-            // Check if user enabled "Keep Screen On"
-            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-            val keepScreenOn = prefs.getBoolean("keep_screen_on", true)
-
-            if (keepScreenOn) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
-
+            // 4. Initialize WebView
             Log.d("MainActivity", "Setting up WebView...")
-            webView = findViewById(R.id.webview)
-            if (webView == null) {
-                throw Exception("WebView not found in layout!")
-            }
+            setupWebView()
 
-            webView.settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            }
-            webView.webViewClient = WebViewClient()
+            // 5. Initialize Cast framework
+            Log.d("MainActivity", "Initializing Cast framework...")
+            initializeCastFramework()
 
-            initializeCastContext()
+            // 6. Set up MediaRouteButton
+            setupMediaRouteButton()
 
-            Log.d("MainActivity", "Setting up menu button...")
-            menuButton = findViewById(R.id.menu_button)
-            if (menuButton == null) {
-                throw Exception("Menu button not found in layout!")
-            }
-
-            menuButton.setOnClickListener {
-                showMenu(it)
-            }
-
-            Log.d("MainActivity", "Initializing Cast context...")
-            GlobalScope.launch(Dispatchers.Default) {
-                try {
-                    castContext = CastContext.getSharedInstance(this@MainActivity)
-                    Log.d("MainActivity", "Cast context initialized")
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Cast context error: ${e.message}")
-                }
-            }
-
+            // 7. Load URL
             Log.d("MainActivity", "Loading URL...")
             val url = getStoredUrl() ?: "http://192.168.86.101"
             Log.d("MainActivity", "URL to load: $url")
             webView.loadUrl(url)
 
-            Log.d("MainActivity", "MainActivity created successfully")
+            Log.d("MainActivity", "✅ MainActivity created successfully")
 
+        } catch (e: DeadObjectException) {
+            Log.w("MainActivity", "DeadObjectException (safe to ignore): ${e.message}")
         } catch (e: Exception) {
-            Log.e("MainActivity", "CRASH in onCreate: ${e.message}")
+            Log.e("MainActivity", "❌ CRASH in onCreate: ${e.message}")
             e.printStackTrace()
         }
     }
+    private fun configureScreenSettings() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val keepScreenOn = prefs.getBoolean("keep_screen_on", true)
 
-    private fun initializeCastContext() {
-        GlobalScope.launch(Dispatchers.Main) {
-            try {
-                // Try to initialize Cast context
-                castContext = CastContext.getSharedInstance(this@MainActivity)
-                Log.d("MainActivity", "✅ Cast context initialized successfully")
-            } catch (e: Exception) {
-                Log.w("MainActivity", "⚠️ Cast not available: ${e.message}")
-                // Cast framework not available or not initialized
-                // App will still work without Cast
-            }
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            Log.d("MainActivity", "Screen on: ENABLED")
+        } else {
+            Log.d("MainActivity", "Screen on: DISABLED")
         }
     }
+    private fun setupWebView() {
+        webView = findViewById(R.id.webview)
+        if (webView == null) {
+            throw Exception("WebView not found in layout!")
+        }
+
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        }
+        webView.webViewClient = WebViewClient()
+        Log.d("MainActivity", "✅ WebView configured")
+    }
+    private fun initializeCastFramework() {
+        try {
+            val castContext = CastContext.getSharedInstance(this)
+            Log.d("MainActivity", "✅ Cast context initialized successfully")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Cast context error: ${e.message}")
+        }
+    }
+    private fun setupMediaRouteButton() {
+        try {
+            val mediaRouteButton = findViewById<MediaRouteButton>(R.id.media_route_button)
+            if (mediaRouteButton != null) {
+                CastButtonFactory.setUpMediaRouteButton(this, mediaRouteButton)
+                Log.d("MainActivity", "✅ Cast button setup complete")
+            } else {
+                Log.w("MainActivity", "⚠️ MediaRouteButton not found in layout")
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Error setting up MediaRouteButton: ${e.message}")
+        }
+    }
+
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
 
-        try {
-            // Setup Cast button with CastButtonFactory
-            val mediaRouteMenuItem = menu?.findItem(R.id.media_route_menu_item)
-            if (mediaRouteMenuItem != null) {
-                val mediaRouteButton = mediaRouteMenuItem.actionView as? MediaRouteButton
-                if (mediaRouteButton != null) {
-                    CastButtonFactory.setUpMediaRouteButton(
-                        this,
-                        mediaRouteButton
-                    )
-                    Log.d("MainActivity", "✅ Cast button setup complete")
-                } else {
-                    Log.w("MainActivity", "⚠️ MediaRouteButton not found in menu item")
-                }
+        val mediaRouteMenuItem = menu?.findItem(R.id.media_route_menu_item)
+        if (mediaRouteMenuItem != null) {
+            val mediaRouteButton = mediaRouteMenuItem.actionView as? MediaRouteButton
+
+            if (mediaRouteButton != null) {
+                CastButtonFactory.setUpMediaRouteButton(this, mediaRouteButton)
+                Log.d("MainActivity", "✅ Cast button setup complete")
+            } else {
+                Log.w("MainActivity", "⚠️ MediaRouteButton not found in actionView")
             }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "❌ Error setting up Cast button: ${e.message}")
         }
 
         return true
     }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_settings -> {
+                // Handle settings
+                true
+            }
+            R.id.menu_about -> {
+                // Handle about
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
 
     override fun onResume() {
         super.onResume()
@@ -140,39 +162,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        if (::castContext.isInitialized) {
-            castContext.sessionManager.removeSessionManagerListener(
-                sessionManagerListener,
-                Session::class.java
-            )
-        }
         super.onPause()
+        try {
+            //castContext = null
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error in onPause: ${e.message}")
+        }
     }
 
-    private fun showMenu(view: android.view.View) {
-        val popupMenu = PopupMenu(this, view)
-        popupMenu.menuInflater.inflate(R.menu.menu_main, popupMenu.menu)
+    private var popupMenu: PopupMenu? = null
 
-        if (::castContext.isInitialized) {
-            com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(
-                this,
-                popupMenu.menu,
-                R.id.media_route_menu_item
-            )
+
+
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            popupMenu?.dismiss()
+            popupMenu = null
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error dismissing popupMenu: ${e.message}")
         }
-
-        popupMenu.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.action_settings -> {
-                    startActivity(android.content.Intent(this, SettingsActivity::class.java))
-                    true
-                }
-                else -> false
-            }
-        }
-
-        popupMenu.show()
     }
+
 
     private fun getStoredUrl(): String? {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)

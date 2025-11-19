@@ -6,13 +6,13 @@ import com.google.android.gms.cast.framework.OptionsProvider
 import com.google.android.gms.cast.framework.SessionProvider
 
 class CastOptionsProvider : OptionsProvider {
-
     override fun getCastOptions(context: Context): CastOptions {
-        val receiverAppId = "CC1AD845" // Google's default receiver ID
         return CastOptions.Builder()
-            .setReceiverApplicationId(receiverAppId)
+            .setReceiverApplicationId("CC1AD845")
             .build()
     }
 
-    override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null
+    override fun getAdditionalSessionProviders(context: Context): List<SessionProvider> {
+        return emptyList()
+    }
 }

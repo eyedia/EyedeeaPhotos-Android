@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout  xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
     <!-- WebView (full screen) -->
     <WebView
@@ -10,18 +11,21 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Floating Menu Button with Material Icon -->
-    <ImageButton
-        android:id="@+id/menu_button"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Menu"
-        android:scaleType="centerInside"
-        android:src="@android:drawable/ic_menu_more"
-        android:elevation="8dp" />
+    <!-- Toolbar with menu -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:elevation="4dp"
+        app:titleTextColor="@android:color/white" />
 
-</FrameLayout>
+    <androidx.mediarouter.app.MediaRouteButton
+        android:id="@+id/media_route_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_margin="16dp"
+        app:showAsAction="always" />
+
+</LinearLayout>
