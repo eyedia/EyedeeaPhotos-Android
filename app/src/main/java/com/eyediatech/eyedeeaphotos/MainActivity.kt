@@ -16,6 +16,7 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadOptions
+import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.framework.CastSession
 
@@ -71,13 +72,51 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendWebViewContentToCast() {
+        val castSession = castSession as? CastSession ?: return
+        val remoteMediaClient = castSession.remoteMediaClient ?: return
+
+        try {
+            val baseUrl = getStoredUrl() ?: "http://192.168.86.101"
+            // Dynamically construct the video feed URL
+            val videoFeedUrl = baseUrl + "/streamer/video_feed_mp4"
+
+            Log.d("CastSession", "🎬 Casting video feed: $videoFeedUrl")
+
+            // Create MediaInfo for the video stream
+            val mediaInfo = MediaInfo.Builder(videoFeedUrl)
+                .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                .setContentType("video/mp4")
+                .setMetadata(MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
+                    putString(MediaMetadata.KEY_TITLE, "Eyedeea Photos")
+                })
+                .build()
+
+            // Create load request and send to Chromecast
+            val mediaLoadRequestData = MediaLoadRequestData.Builder()
+                .setMediaInfo(mediaInfo)
+                .setAutoplay(true)
+                .build()
+
+            remoteMediaClient.load(mediaLoadRequestData).setResultCallback { result ->
+                if (result.status.isSuccess) {
+                    Log.d("CastSession", "✅ Video feed sent to Chromecast: $videoFeedUrl")
+                } else {
+                    Log.e("CastSession", "❌ Failed to cast video feed")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CastSession", "❌ Error casting video: ${e.message}")
+        }
+    }
+
+    private fun sendWebViewContentToCast_2() {
         val castSessionObj = castSession as? CastSession
         val remoteMediaClient = castSessionObj?.remoteMediaClient ?: return
 
         try {
             // Test with a public image URL
-            val imageUrl = "https://commondatastorage.googleapis.com/gtv-videos-library/sample/images/bigbuckbunny.jpg"
-
+            //val imageUrl = "https://www.kasandbox.org/programming-images/avatars/leaf-blue.png"
+            val imageUrl = "http://192.168.86.101/api/view"
             Log.d("CastSession", "📺 Sending image to Chromecast: $imageUrl")
 
             val mediaInfo = MediaInfo.Builder(imageUrl)
@@ -106,32 +145,14 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun sendWebViewContentToCast2() {
-        val remoteMediaClient = (castSession as? CastSession)?.remoteMediaClient ?: return
-
-        try {
-            val mediaInfo = MediaInfo.Builder("https://drive.google.com/file/d/1OiEDnOSsQSL8PN29G_Ita8nnyNYl_Fju/view")
-                .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                .setContentType("image/png")
-                .setMetadata(MediaMetadata(MediaMetadata.MEDIA_TYPE_PHOTO).apply {
-                    putString(MediaMetadata.KEY_TITLE, "Test Image")
-                })
-                .build()
-
-            remoteMediaClient.load(mediaInfo)
-            Log.d("CastSession", "✅ Test image sent")
-        } catch (e: Exception) {
-            Log.e("CastSession", "❌ Error: ${e.message}")
-        }
-    }
-
-    private fun sendWebViewContentToCast1() {
+    private fun sendWebViewContentToCast_1() {
         val castSessionObj = castSession as? CastSession
         val remoteMediaClient = castSessionObj?.remoteMediaClient ?: return
 
         try {
             // Get the current WebView URL
-            val webViewUrl = webView.url ?: "http://192.168.86.101"
+            //val webViewUrl = webView.url ?: "https://www.google.com/"
+            val webViewUrl = "http://192.168.86.101/api/view"
 
             Log.d("CastSession", "📺 Sending WebView URL to Chromecast: $webViewUrl")
 
