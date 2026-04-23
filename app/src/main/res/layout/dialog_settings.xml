@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/ipEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Website Address"
+        android:inputType="textUri"
+        android:layout_marginBottom="12dp" />
+
+    <EditText
+        android:id="@+id/refreshEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Refresh interval (seconds, min: 60, max: 300)"
+        android:inputType="number"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/userTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Logged in as: -"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnLogout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Logout"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:textColor="@android:color/holo_red_dark"
+        android:layout_marginBottom="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Save"
+            android:background="@drawable/button_style"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cancel"
+            android:background="@drawable/button_style" />
+
+    </LinearLayout>
+
+</LinearLayout>
