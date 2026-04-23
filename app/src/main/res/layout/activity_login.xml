@@ -1,18 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="32dp"
-    android:gravity="center">
+    android:gravity="center"
+    android:background="@android:color/white">
 
     <!-- App Logo -->
     <ImageView
         android:id="@+id/logoImageView"
         android:layout_width="120dp"
         android:layout_height="120dp"
-        android:src="@drawable/ic_launcher_foreground"
+        android:src="@mipmap/ic_launcher"
         android:layout_marginBottom="16dp" />
+
 
     <TextView
         android:id="@+id/titleTextView"
@@ -41,15 +44,19 @@
         android:gravity="center"
         android:visibility="gone">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/browserLoginButton"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="60dp"
             android:text="Sign In"
             android:textSize="18sp"
             android:textAllCaps="false"
-            android:backgroundTint="@color/black"
+            android:backgroundTint="@color/colorPrimary"
             android:textColor="@color/white"
+            android:paddingHorizontal="56dp"
+            app:cornerRadius="30dp"
+            app:elevation="12dp"
+            app:rippleColor="#40FFFFFF"
             android:layout_marginHorizontal="16dp" />
 
         <TextView

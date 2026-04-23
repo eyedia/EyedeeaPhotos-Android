@@ -10,7 +10,7 @@ object RetrofitClient {
     private val BASE_URL = BuildConfig.BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.HEADERS
     }
 
     private val okHttpClient = OkHttpClient.Builder()

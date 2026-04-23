@@ -129,6 +129,7 @@ dependencies {
     implementation("com.google.android.material:material:1.10.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.webkit:webkit:1.9.0")
+    implementation("androidx.browser:browser:1.7.0")
     implementation("androidx.leanback:leanback:1.2.0-alpha04")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")

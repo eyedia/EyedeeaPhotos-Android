@@ -40,7 +40,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var authRepository: AuthRepository
-    private var isTokenInjected = false
     private val storagePermissionRequestCode = 1001
 
     // For handling downloads after permission grant
@@ -58,6 +57,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.d("AUTH_DEBUG", "MainActivity onCreate - Authenticated: ${AuthRepository(this).isAuthenticated()}")
         setContentView(R.layout.activity_main)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -74,6 +74,12 @@ class MainActivity : AppCompatActivity() {
 
         // Get saved IP or use default
         val savedIp = sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
+        
+        val startUrl = if (authRepository.isAuthenticated()) {
+            BuildConfig.BASE_URL + "/library"
+        } else {
+            savedIp
+        }
 
         // Setup WebView
         setupWebView()
@@ -83,8 +89,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             // Load URL only if there is no saved state
             try {
-                Log.d("WEBVIEW_DEBUG", "Loading: $savedIp")
-                webView.loadUrl(savedIp)
+                Log.d("WEBVIEW_DEBUG", "Loading: $startUrl")
+                webView.loadUrl(startUrl)
             } catch (e: Exception) {
                 Log.e("WEBVIEW_DEBUG", "Load error: ${e.message}")
                 handleLoadError()
@@ -174,9 +180,17 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                if (!isTokenInjected) {
-                    injectTokenIntoLocalStorage()
-                    isTokenInjected = true
+                Log.d("AUTH_DEBUG", "onPageFinished: $url")
+                
+                if (authRepository.isAuthenticated()) {
+                    val isAtLogin = url?.contains("/auth/login") == true
+                    val isAtRoot = url == BuildConfig.BASE_URL || url == "${BuildConfig.BASE_URL}/"
+                    val isAtView = url?.contains("/view") == true
+                    
+                    if (isAtLogin || isAtRoot || isAtView) {
+                        Log.d("AUTH_DEBUG", "Detected login/root/view page while authenticated. Injecting token.")
+                        injectTokenIntoLocalStorage()
+                    }
                 }
             }
 
@@ -330,6 +344,10 @@ class MainActivity : AppCompatActivity() {
             }
             btnLogout.setOnClickListener {
                 authRepository.clearAuthData()
+                // Clear web data to ensure clean logout
+                CookieManager.getInstance().removeAllCookies(null)
+                WebStorage.getInstance().deleteAllData()
+
                 startActivity(Intent(this@MainActivity, LoginActivity::class.java))
                 finish()
                 alertDialog.dismiss()
@@ -382,16 +400,21 @@ class MainActivity : AppCompatActivity() {
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
 
         val js = """
-            localStorage.setItem('auth_token', '$token');
-            localStorage.setItem('auth_user', '$escapedUserJson');
-            localStorage.setItem('auth_group', '$role');
+            (function() {
+                try {
+                    localStorage.setItem('auth_token', '$token');
+                    localStorage.setItem('auth_user', '$escapedUserJson');
+                    localStorage.setItem('auth_group', '$role');
+                    console.log('Injection successful');
+                    window.location.href = '$libraryUrl';
+                } catch (e) {
+                    console.error('Injection failed: ' + e);
+                }
+            })();
         """.trimIndent()
 
-        Log.d("AUTH_DEBUG", "Injecting storage according to web team specs")
-        webView.evaluateJavascript(js) {
-            Log.d("AUTH_DEBUG", "Storage injected. Navigating to /library")
-            webView.loadUrl(libraryUrl)
-        }
+        Log.d("AUTH_DEBUG", "Injecting storage and redirecting via JS")
+        webView.evaluateJavascript(js, null)
     }
 
     private fun handleLoadError() {

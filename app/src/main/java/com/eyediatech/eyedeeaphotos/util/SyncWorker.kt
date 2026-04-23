@@ -92,6 +92,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         for (photo in batch) {
             val file = File(photo.internalPath)
             if (file.exists()) {
+                Log.d("SyncWorker", "Adding to batch: ${file.name}")
                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                 photosParts.add(MultipartBody.Part.createFormData("photos", file.name, requestFile))
                 

@@ -20,6 +20,7 @@ class AuthRepository(context: Context) {
     )
 
     fun saveAuthData(token: String, householdId: String, sourceId: String?, username: String, userJson: String, group: String?) {
+        android.util.Log.d("AUTH_DEBUG", "Saving Auth Data (Commit): Token exists=${token.isNotEmpty()}, User=$username, Household=$householdId")
         sharedPreferences.edit()
             .putString("token", token)
             .putString("household_id", householdId)
@@ -27,7 +28,7 @@ class AuthRepository(context: Context) {
             .putString("username", username)
             .putString("user_json", userJson)
             .putString("group", group)
-            .apply()
+            .commit()
     }
 
     fun getToken(): String? = sharedPreferences.getString("token", null)
@@ -49,6 +50,7 @@ class AuthRepository(context: Context) {
     }
 
     fun clearAuthData() {
+        android.util.Log.d("AUTH_DEBUG", "Clearing all Auth Data")
         sharedPreferences.edit().clear().apply()
     }
 

@@ -43,8 +43,12 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        android.util.Log.d("AUTH_DEBUG", "onNewIntent called with intent: $intent")
-        setIntent(intent) // This is the missing piece!
+        val action = intent.action
+        val data = intent.data
+        android.util.Log.d("AUTH_DEBUG", "onNewIntent triggered!")
+        android.util.Log.d("AUTH_DEBUG", "Action: $action")
+        android.util.Log.d("AUTH_DEBUG", "Data: $data")
+        setIntent(intent)
         handleDeepLink(intent)
     }
 
@@ -97,13 +101,25 @@ class LoginActivity : AppCompatActivity() {
     private fun setupMobileLogin() {
         binding.loginForm.visibility = View.VISIBLE
         binding.browserLoginButton.setOnClickListener {
-            // LOGIN_URL already contains ?device=android
-            val loginUrl = "${BuildConfig.LOGIN_URL}&callback=eyedeea://auth"
-            android.util.Log.d("AUTH_DEBUG", "Launching browser with URL: $loginUrl")
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
-            // Use NEW_TASK to ensure we can come back cleanly
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
+            // Add a timestamp to prevent any potential caching of the redirect
+            val timestamp = System.currentTimeMillis()
+            val encodedCallback = Uri.encode("eyedeea://auth?t=$timestamp")
+            val loginUrl = "${BuildConfig.LOGIN_URL}&callback=$encodedCallback"
+            android.util.Log.d("AUTH_DEBUG", "Launching Chrome Custom Tab with URL: $loginUrl")
+            
+            try {
+                val builder = androidx.browser.customtabs.CustomTabsIntent.Builder()
+                builder.setShowTitle(true)
+                builder.setShareState(androidx.browser.customtabs.CustomTabsIntent.SHARE_STATE_OFF)
+                builder.setInstantAppsEnabled(false)
+                val customTabsIntent = builder.build()
+                customTabsIntent.launchUrl(this, Uri.parse(loginUrl))
+            } catch (e: Exception) {
+                android.util.Log.e("AUTH_DEBUG", "Custom Tabs failed, falling back to browser", e)
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            }
         }
     }
 

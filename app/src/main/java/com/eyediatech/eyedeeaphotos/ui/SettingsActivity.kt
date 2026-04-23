@@ -133,11 +133,28 @@ class SettingsActivity : AppCompatActivity() {
             photoRepository.allQueuedPhotos.collectLatest { photos ->
                 adapter.submitList(photos)
                 updateSyncStatusUI(photos)
+                updateNextSyncTime(photos.isNotEmpty())
             }
         }
 
         WorkManager.getInstance(this).getWorkInfosByTagLiveData("SyncTag").observe(this) { workInfos ->
-            val workInfo = workInfos?.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            val runningWork = workInfos?.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            val succeededWork = workInfos?.firstOrNull { it.state == WorkInfo.State.SUCCEEDED }
+            
+            // Priority 1: Check if any sync just finished
+            if (succeededWork != null && !isSyncing) {
+                 // Check if it's a recent success (WorkManager might keep old successes in the list)
+                 // For simplicity, if we see a success and we were waiting for it, we close.
+                 // We can use the tag 'ManualSync' specifically if we added it.
+                 val isManualSuccess = succeededWork.tags.contains("ManualSync")
+                 if (isManualSuccess) {
+                     Toast.makeText(this@SettingsActivity, "Sync completed successfully", Toast.LENGTH_SHORT).show()
+                     finish()
+                     return@observe
+                 }
+            }
+
+            val workInfo = runningWork
                 ?: workInfos?.firstOrNull { it.tags.contains("PeriodicSync") }
                 ?: workInfos?.firstOrNull()
 
@@ -157,7 +174,7 @@ class SettingsActivity : AppCompatActivity() {
                         binding.syncProgressBar.visibility = View.GONE
                         binding.syncNowButton.text = "Sync Now"
                         binding.syncNowButton.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0EA5E9"))
-                        updateNextSyncTime()
+                        updateNextSyncTime(adapter.itemCount > 0)
                     }
                 }
             } else {
@@ -169,7 +186,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updateSyncStatusUI(photos: List<QueuedPhoto>) {
         if (photos.isEmpty()) {
-            binding.syncTipTextView.text = "No Photos in the queue, you can add photos by selecting on your photos > click share > select Eyedeea Photos or you can add by clicking below"
+            binding.syncTipTextView.text = "No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here."
             if (!isSyncing) {
                 binding.syncNowButton.isEnabled = false
                 binding.syncNowButton.alpha = 0.5f
@@ -181,7 +198,12 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateNextSyncTime() {
+    private fun updateNextSyncTime(hasPhotos: Boolean) {
+        if (!hasPhotos) {
+            binding.nextSyncTextView.visibility = View.GONE
+            return
+        }
+        binding.nextSyncTextView.visibility = View.VISIBLE
         WorkManager.getInstance(this).getWorkInfosForUniqueWorkLiveData("PeriodicSync").observe(this) { workInfos ->
             val workInfo = workInfos?.firstOrNull()
             if (workInfo != null && workInfo.state != WorkInfo.State.CANCELLED) {
@@ -222,6 +244,7 @@ class SettingsActivity : AppCompatActivity() {
         val oneTimeWorkRequest = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
             .addTag("SyncTag")
+            .addTag("ManualSync")
             .build()
 
         WorkManager.getInstance(this).enqueueUniqueWork(
@@ -273,6 +296,10 @@ class SettingsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             photoRepository.deleteAll()
             authRepository.clearAuthData()
+            // Clear web data to ensure clean logout
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            android.webkit.WebStorage.getInstance().deleteAllData()
+
             val intent = Intent(this@SettingsActivity, LoginActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)
