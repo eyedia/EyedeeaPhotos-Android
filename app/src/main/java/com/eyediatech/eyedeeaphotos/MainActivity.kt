@@ -165,7 +165,7 @@ class MainActivity : AppCompatActivity() {
             if (resId != 0) {
                 val settingsIcon = findViewById<ImageView>(resId)
                 settingsIcon.setOnClickListener {
-                    showSettingsDialog()
+                    startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
                 }
             }
         }
@@ -226,7 +226,11 @@ class MainActivity : AppCompatActivity() {
                         return@setOnKeyListener true
                     }
                     KeyEvent.KEYCODE_MENU -> {
-                        showSettingsDialog()
+                        if (BuildConfig.FLAVOR != "firetv") {
+                            startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
+                        } else {
+                            showSettingsDialog()
+                        }
                         return@setOnKeyListener true
                     }
                     KeyEvent.KEYCODE_BACK -> {

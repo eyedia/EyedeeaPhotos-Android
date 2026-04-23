@@ -4,10 +4,14 @@
     <color name="white">#FFFFFFFF</color>
     <color name="purple_500">#6200EE</color>
     <color name="purple_700">#3700B3</color>
-    <color name="colorPrimary">#6200EE</color>
-    <color name="colorAccent">#3700B3</color>
-    <color name="button_default">#2196F3</color>
-    <color name="button_pressed">#1976D2</color>
-    <color name="button_focused">#BBDEFB</color>
-    <color name="button_text_color">#FF000000</color>
+    <color name="colorPrimary">#0EA5E9</color>
+    <color name="colorAccent">#0284C7</color>
+    <color name="button_default">#0EA5E9</color>
+    <color name="button_pressed">#0284C7</color>
+    <color name="button_focused">#7DD3FC</color>
+    <color name="button_text_color">#FFFFFFFF</color>
+    <color name="panel_background">#FFFFFF</color>
+    <color name="text_primary">#1E293B</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="divider_color">#E2E8F0</color>
 </resources>

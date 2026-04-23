@@ -37,6 +37,17 @@ class AuthRepository(context: Context) {
     fun getUserJson(): String? = sharedPreferences.getString("user_json", null)
     fun getGroup(): String? = sharedPreferences.getString("group", null)
 
+    fun getEmail(): String? {
+        val userJson = getUserJson() ?: return null
+        return try {
+            val user = com.google.gson.Gson().fromJson(userJson, com.eyediatech.eyedeeaphotos.data.User::class.java)
+            user.email.ifBlank { null }
+        } catch (e: Exception) {
+            // If it's not a valid JSON, maybe the userJson itself is just the email string or name
+            if (userJson.contains("@")) userJson else null
+        }
+    }
+
     fun clearAuthData() {
         sharedPreferences.edit().clear().apply()
     }

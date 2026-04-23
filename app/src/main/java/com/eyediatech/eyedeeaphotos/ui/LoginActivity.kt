@@ -76,7 +76,11 @@ class LoginActivity : AppCompatActivity() {
                 if (!token.isNullOrBlank() && !name.isNullOrBlank() && !householdId.isNullOrBlank()) {
                     android.util.Log.d("AUTH_DEBUG", "SUCCESS: Saving auth data and navigating to main")
                     authRepository.saveAuthData(token, householdId, sourceId, name, userJson ?: "", group)
-                    navigateToMain()
+                    
+                    val mainIntent = Intent(this, MainActivity::class.java)
+                    mainIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(mainIntent)
+                    finish()
                 } else {
                     android.util.Log.e("AUTH_DEBUG", "FAILURE: One or more required params are null or blank")
                     Toast.makeText(this, "Login failed: Missing data", Toast.LENGTH_SHORT).show()
@@ -97,6 +101,8 @@ class LoginActivity : AppCompatActivity() {
             val loginUrl = "${BuildConfig.LOGIN_URL}&callback=eyedeea://auth"
             android.util.Log.d("AUTH_DEBUG", "Launching browser with URL: $loginUrl")
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+            // Use NEW_TASK to ensure we can come back cleanly
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
         }
     }

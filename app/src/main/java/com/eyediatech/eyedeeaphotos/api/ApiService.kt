@@ -15,13 +15,17 @@ interface ApiService {
     suspend fun pollDeviceStatus(@Query("device_code") deviceCode: String): Response<LoginResponse>
 
     @GET("/api/v1/{householdId}/sources")
-    suspend fun getSources(@Path("householdId") householdId: String): Response<List<Source>>
+    suspend fun getSources(
+        @Header("Authorization") token: String,
+        @Path("householdId") householdId: String
+    ): Response<List<Source>>
 
     @GET("/api/v1/{householdId}/sources/{sourceId}/browse/upload/quota-summary")
     suspend fun getQuotaSummary(
+        @Header("Authorization") token: String,
         @Path("householdId") householdId: String,
         @Path("sourceId") sourceId: String
-    ): Response<QuotaSummary>
+    ): Response<QuotaResponse>
 
     @Multipart
     @POST("/api/v1/{householdId}/sources/{sourceId}/browse/upload")
@@ -30,17 +34,20 @@ interface ApiService {
         @Path("householdId") householdId: String,
         @Path("sourceId") sourceId: String,
         @Part("folderPath") folderPath: okhttp3.RequestBody,
-        @Part photos: List<okhttp3.MultipartBody.Part>
-    ): Response<UploadResponse>
+        @Part("scanAfterUpload") scanAfterUpload: okhttp3.RequestBody,
+        @Part photos: List<okhttp3.MultipartBody.Part>,
+        @Part("relativePaths") relativePaths: Array<okhttp3.RequestBody>
+    ): Response<EnhancedUploadResponse>
 
     @POST("/api/v1/{householdId}/sources/{sourceId}/scan")
     suspend fun triggerScan(
         @Header("Authorization") token: String,
         @Path("householdId") householdId: String,
         @Path("sourceId") sourceId: String,
-        @Query("folder") folder: String = "raw",
-        @Query("process") process: String = "background"
-    ): Response<Unit>
+        @Query("folder_name") folderName: String = "raw",
+        @Query("process") process: String = "background",
+        @Query("process_count") processCount: Int = 4
+    ): Response<EnhancedScanResponse>
 
     @GET("/api/v1/{householdId}/sources/{sourceId}/scan")
     suspend fun getScanStatus(
@@ -51,6 +58,4 @@ interface ApiService {
 }
 
 data class Source(val id: String, val name: String)
-data class QuotaSummary(val canUpload: Boolean, val reason: String?)
-data class UploadResponse(val success: Boolean, val message: String?)
 data class ScanStatus(val active: Boolean)

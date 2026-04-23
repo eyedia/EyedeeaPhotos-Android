@@ -4,6 +4,7 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
 }
 
 // Manually load properties to bypass environment issues
@@ -137,6 +138,23 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Room
+    val roomVersion = "2.7.0"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+    // For Kotlin Symbol Processing (KSP) if you want to use it, but keeping it simple with kapt if it's already there, 
+    // though kapt isn't explicitly in plugins. Let's use annotationProcessor for now or check plugins.
+    // Actually, I should check if Kapt or KSP is applied. 
+    // Based on plugins block: id("org.jetbrains.kotlin.android"), nothing else.
+    // Let's add Kapt.
+
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 
     // QR Code
     implementation("com.google.zxing:core:3.5.3")
