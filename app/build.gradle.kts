@@ -2,9 +2,9 @@ import java.util.Properties
 import java.io.FileInputStream
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 // Manually load properties to bypass environment issues
@@ -80,7 +80,7 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField("String", "BASE_URL", "\"https://eyedeeaphotos.eyediatech.com\"")
+            buildConfigField("String", "BASE_URL", "\"https://eyedeeaphotos.eyediatech.com/\"")
             buildConfigField("String", "VIEW_URL", "\"https://eyedeeaphotos.eyediatech.com/view\"")
             buildConfigField("String", "LOGIN_URL", "\"https://eyedeeaphotos.eyediatech.com/auth/login?device=android\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "false")
@@ -88,7 +88,7 @@ android {
         getByName("debug") {
             isDebuggable = true
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100:5174\"")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100:5174/\"")
             buildConfigField("String", "VIEW_URL", "\"http://192.168.86.100:5174/view\"")
             buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.100:5174/auth/login?device=android\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "false")

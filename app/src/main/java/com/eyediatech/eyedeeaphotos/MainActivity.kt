@@ -17,8 +17,6 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.*
-import android.widget.Button
-import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -107,10 +105,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun injectAuthCookie() {
-        // No longer used based on API team feedback
-    }
-
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         webView.saveState(outState)
@@ -187,36 +181,31 @@ class MainActivity : AppCompatActivity() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         // --- Download Logic ---
-        if (BuildConfig.ENABLE_DOWNLOADS) {
-            webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
-                handleDownload(url, userAgent, contentDisposition, mimetype)
-            }
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            handleDownload(url, userAgent, contentDisposition, mimetype)
         }
 
         // --- Settings Icon for Mobile Flavor ---
-        if (BuildConfig.FLAVOR == "mobile") {
-            val containerId = resources.getIdentifier("settingsButtonContainer", "id", packageName)
-            if (containerId != 0) {
-                settingsButtonContainer = findViewById(containerId)
-                settingsIcon = findViewById(resources.getIdentifier("settingsIcon", "id", packageName))
-                queueBadge = findViewById(resources.getIdentifier("queueBadge", "id", packageName))
-                
-                settingsButtonContainer?.setOnClickListener {
-                    startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
-                }
+        settingsButtonContainer = findViewById(R.id.settingsButtonContainer)
+        settingsIcon = findViewById(R.id.settingsIcon)
+        queueBadge = findViewById(R.id.queueBadge)
 
-                // Observe queue count
-                photoRepository = PhotoRepository(AppDatabase.getDatabase(this).photoDao())
-                lifecycleScope.launch {
-                    photoRepository.allQueuedPhotos.collectLatest { photos ->
-                        if (photos.isNotEmpty()) {
-                            queueBadge?.visibility = View.VISIBLE
-                            queueBadge?.text = if (photos.size > 99) "99+" else photos.size.toString()
-                            settingsIcon?.alpha = 1.0f
-                        } else {
-                            queueBadge?.visibility = View.GONE
-                            settingsIcon?.alpha = 0.4f
-                        }
+        if (settingsButtonContainer != null) {
+            settingsButtonContainer?.setOnClickListener {
+                startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
+            }
+
+            // Observe queue count
+            photoRepository = PhotoRepository(AppDatabase.getDatabase(this).photoDao())
+            lifecycleScope.launch {
+                photoRepository.allQueuedPhotos.collectLatest { photos ->
+                    if (photos.isNotEmpty()) {
+                        queueBadge?.visibility = View.VISIBLE
+                        queueBadge?.text = if (photos.size > 99) "99+" else photos.size.toString()
+                        settingsIcon?.alpha = 1.0f
+                    } else {
+                        queueBadge?.visibility = View.GONE
+                        settingsIcon?.alpha = 0.4f
                     }
                 }
             }
@@ -239,7 +228,7 @@ class MainActivity : AppCompatActivity() {
                 Log.d("AUTH_DEBUG", "onPageFinished: $url")
                 
                 if (url != "file:///android_asset/error.html") {
-                    sharedPreferences.edit().putBoolean(SERVER_DOWN, false).apply()
+                    sharedPreferences.edit { putBoolean(SERVER_DOWN, false) }
                 }
                 
                 updateSettingsIconVisibility(url)
@@ -270,7 +259,9 @@ class MainActivity : AppCompatActivity() {
                 description: String?,
                 failingUrl: String?
             ) {
-                handleLoadError()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    handleLoadError()
+                }
             }
         }
 
@@ -302,11 +293,7 @@ class MainActivity : AppCompatActivity() {
                         return@setOnKeyListener true
                     }
                     KeyEvent.KEYCODE_MENU -> {
-                        if (BuildConfig.FLAVOR != "firetv") {
-                            startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
-                        } else {
-                            showSettingsDialog()
-                        }
+                        startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
                         return@setOnKeyListener true
                     }
                     KeyEvent.KEYCODE_BACK -> {
@@ -366,97 +353,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun showSettingsDialog() {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
-        val websiteAddressInput = dialogView.findViewById<EditText>(R.id.ipEditText)
-        val refreshInput = dialogView.findViewById<EditText>(R.id.refreshEditText)
-        val userTextView = dialogView.findViewById<TextView>(R.id.userTextView)
-        val btnLogout = dialogView.findViewById<Button>(R.id.btnLogout)
-
-        websiteAddressInput.setText(sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT))
-        refreshInput.setText(sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 10).toString())
-        userTextView.text = "Logged in as: ${authRepository.getUsername()}"
-
-        val alertDialog = AlertDialog.Builder(this)
-            .setTitle(R.string.account_uploads)
-            .setView(dialogView)
-            .create()
-
-        alertDialog.setOnShowListener {
-            val btnSave = dialogView.findViewById<Button>(R.id.btnSave)
-            val btnCancel = dialogView.findViewById<Button>(R.id.btnCancel)
-
-            btnSave.setOnClickListener {
-                val websiteAddress = websiteAddressInput.text.toString().trim()
-                val refreshInterval = refreshInput.text.toString().toIntOrNull() ?: 10
-
-                CoroutineScope(Dispatchers.Main).launch {
-                    val validUrl = isValidUrl(websiteAddress)
-                    val validInterval = isValidRefreshInterval(refreshInterval)
-                    if (validUrl && validInterval) {
-                        saveSettings(websiteAddress, refreshInterval)
-                        webView.loadUrl(websiteAddress)
-                        alertDialog.dismiss()
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Please enter a valid website address and refresh interval (1-300).",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-            btnCancel.setOnClickListener {
-                alertDialog.dismiss()
-            }
-            btnLogout.setOnClickListener {
-                authRepository.clearAuthData()
-                // Clear web data to ensure clean logout
-                CookieManager.getInstance().removeAllCookies(null)
-                WebStorage.getInstance().deleteAllData()
-
-                startActivity(Intent(this@MainActivity, LoginActivity::class.java))
-                finish()
-                alertDialog.dismiss()
-            }
-        }
-        alertDialog.show()
-    }
-
-    private fun saveSettings(websiteAddress: String, refreshInterval: Int) {
-        sharedPreferences.edit(commit = true) {
-            putString(WEBSITE_ADDRESS, websiteAddress)
-            putInt(REFRESH_INTERVAL_KEY, refreshInterval)
-        }
-    }
-
-    private suspend fun isValidUrl(url: String): Boolean {
-        return if (isValidUrlFormat(url)) {
-            isUrlAccessible(url)
-        } else {
-            false
-        }
-    }
-
-    private fun isValidUrlFormat(url: String): Boolean {
-        val regex = """^(https?://(?:[a-zA-Z0-9.-]+|[0-9]{1,3}(?:\.[0-9]{1,3}){3})(?::\d{1,5})?(?:/.*)?)$""".toRegex()
-        return regex.matches(url)
-    }
-
-    private suspend fun isUrlAccessible(urlString: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val url = URL(urlString)
-            val urlConnection = url.openConnection() as HttpURLConnection
-            urlConnection.requestMethod = "GET"
-            urlConnection.connectTimeout = 5000
-            urlConnection.readTimeout = 5000
-            urlConnection.connect()
-            val responseCode = urlConnection.responseCode
-            responseCode in 200..399
-        } catch (e: Exception) {
-            false
-        }
-    }
     private fun injectTokenIntoLocalStorage() {
         val token = authRepository.getToken() ?: return
         val userJson = authRepository.getUserJson() ?: "{}"
@@ -486,12 +382,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleLoadError() {
         runOnUiThread {
-            sharedPreferences.edit().putBoolean(SERVER_DOWN, true).apply()
+            sharedPreferences.edit { putBoolean(SERVER_DOWN, true) }
             webView.loadUrl("file:///android_asset/error.html")
         }
-    }
-
-    private fun isValidRefreshInterval(interval: Int): Boolean {
-        return interval in 1..300
     }
 }

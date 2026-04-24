@@ -12,6 +12,9 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -19,6 +22,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.work.*
 import com.bumptech.glide.Glide
+import com.eyediatech.eyedeeaphotos.R
 import com.eyediatech.eyedeeaphotos.data.AppDatabase
 import com.eyediatech.eyedeeaphotos.data.QueuedPhoto
 import com.eyediatech.eyedeeaphotos.databinding.ActivitySettingsBinding
@@ -84,7 +88,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.logoutButton.setOnClickListener { logout() }
         
         binding.logoLinkButton.setOnClickListener {
-            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://eyedeeaphotos.eyediatech.com/"))
+            val browserIntent = Intent(Intent.ACTION_VIEW, "https://eyedeeaphotos.eyediatech.com/".toUri())
             startActivity(browserIntent)
         }
 
@@ -173,21 +177,21 @@ class SettingsActivity : AppCompatActivity() {
                     WorkInfo.State.RUNNING -> {
                         binding.syncProgressBar.visibility = View.VISIBLE
                         binding.syncProgressBar.isIndeterminate = true
-                        binding.syncNowButton.text = "Cancel"
-                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#EF4444"))
-                        binding.syncTipTextView.text = "Syncing photos..."
+                        binding.syncNowButton.setText(R.string.sync_cancel)
+                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#EF4444".toColorInt())
+                        binding.syncTipTextView.setText(R.string.syncing_photos)
                     }
                     else -> {
                         binding.syncProgressBar.visibility = View.GONE
-                        binding.syncNowButton.text = "Sync Now"
-                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0EA5E9"))
+                        binding.syncNowButton.setText(R.string.sync_now)
+                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#0EA5E9".toColorInt())
                         updateNextSyncTime(adapter.itemCount > 0)
                         updateSyncStatusUI(adapter.currentList)
                     }
                 }
             } else {
-                binding.syncNowButton.text = "Sync Now"
-                binding.syncNowButton.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0EA5E9"))
+                binding.syncNowButton.setText(R.string.sync_now)
+                binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#0EA5E9".toColorInt())
             }
         }
     }
@@ -195,20 +199,20 @@ class SettingsActivity : AppCompatActivity() {
     private fun updateSyncStatusUI(photos: List<QueuedPhoto>) {
         val isServerDown = getSharedPreferences("EPPrefs", MODE_PRIVATE).getBoolean("server_down", false)
         if (photos.isEmpty()) {
-            binding.syncTipTextView.text = "No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here."
+            binding.syncTipTextView.setText(R.string.no_photos_in_queue)
             if (!isSyncing) {
                 binding.syncNowButton.isEnabled = false
                 binding.syncNowButton.alpha = 0.5f
             }
         } else {
-            binding.syncTipTextView.text = "${photos.size} photos in queue"
             if (isServerDown && !isSyncing) {
                 binding.syncNowButton.isEnabled = false
                 binding.syncNowButton.alpha = 0.5f
-                binding.syncTipTextView.text = "${photos.size} photos in queue (Server unavailable)"
+                binding.syncTipTextView.text = getString(R.string.photos_in_queue_server_down, photos.size)
             } else {
                 binding.syncNowButton.isEnabled = true
                 binding.syncNowButton.alpha = 1.0f
+                binding.syncTipTextView.text = getString(R.string.photos_in_queue, photos.size)
             }
         }
     }
@@ -233,7 +237,7 @@ class SettingsActivity : AppCompatActivity() {
             nextSync.add(Calendar.HOUR_OF_DAY, 1)
         }
         
-        binding.nextSyncTextView.text = "Next scheduled sync: ${sdf.format(nextSync.time)}"
+        binding.nextSyncTextView.text = getString(R.string.next_scheduled_sync, sdf.format(nextSync.time))
     }
 
     private fun setupWorkManager() {
@@ -263,7 +267,7 @@ class SettingsActivity : AppCompatActivity() {
         var minute = prefs.getInt("sync_minute", -1)
         if (minute == -1) {
             minute = (0..59).random()
-            prefs.edit().putInt("sync_minute", minute).apply()
+            prefs.edit { putInt("sync_minute", minute) }
         }
         return minute
     }
@@ -302,7 +306,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun queuePhotos(uris: List<Uri>) {
         lifecycleScope.launch {
-            Toast.makeText(this@SettingsActivity, "Adding ${uris.size} photos...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@SettingsActivity, getString(R.string.adding_photos, uris.size), Toast.LENGTH_SHORT).show()
             withContext(Dispatchers.IO) {
                 for (uri in uris) {
                     val internalFile = copyToInternalStorage(uri)
@@ -350,7 +354,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             finalFile
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

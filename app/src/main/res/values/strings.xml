@@ -2,4 +2,25 @@
     <string name="app_name">Eyedeea Photos</string>
     <string name="account_uploads">Account &amp; Uploads</string>
     <string name="settings">Settings</string>
+
+    <!-- Settings Screen -->
+    <string name="visit_website">Visit Website</string>
+    <string name="default_avatar_text">U</string>
+    <string name="user_name_placeholder">User Name</string>
+    <string name="email_placeholder">email@example.com</string>
+    <string name="logout">Logout</string>
+    <string name="photo_queue">Photo Queue</string>
+    <string name="no_photos_in_queue">No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here.</string>
+    <string name="next_scheduled_sync">Next scheduled sync: %s</string>
+    <string name="next_scheduled_sync_empty">Next scheduled sync: &#8211;&#8211;:&#8211;&#8211;</string>
+    <string name="add_photos">Add Photos</string>
+    <string name="sync_now">Sync Now</string>
+    <string name="sync_cancel">Cancel</string>
+    <string name="syncing_photos">Syncing photos&#8230;</string>
+    <string name="photos_in_queue">%1$d photos in queue</string>
+    <string name="photos_in_queue_server_down">%1$d photos in queue (Server unavailable)</string>
+    <string name="need_help">Need help? Contact us at</string>
+    <string name="support_email">support@eyediatech.com</string>
+    <string name="logged_in_as">Logged in as: %s</string>
+    <string name="adding_photos">Adding %1$d photos&#8230;</string>
 </resources>

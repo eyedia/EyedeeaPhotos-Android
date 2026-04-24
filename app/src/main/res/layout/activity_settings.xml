@@ -55,8 +55,9 @@
                         android:layout_height="64dp"
                         android:scaleType="fitCenter"
                         android:src="@mipmap/ic_launcher"
-                        android:contentDescription="Visit Website"
-                        android:foreground="?attr/selectableItemBackground" />
+                        android:contentDescription="@string/visit_website"
+                        android:foreground="?attr/selectableItemBackground"
+                        tools:targetApi="m" />
 
                     <View
                         android:layout_width="1dp"
@@ -71,7 +72,7 @@
                         android:layout_height="48dp"
                         android:background="@drawable/circle_avatar_bg"
                         android:gravity="center"
-                        android:text="U"
+                        android:text="@string/default_avatar_text"
                         android:textColor="@android:color/white"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -87,7 +88,7 @@
                             android:id="@+id/userNameTextView"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="User Name"
+                            android:text="@string/user_name_placeholder"
                             android:textColor="@color/text_primary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -96,7 +97,7 @@
                             android:id="@+id/userEmailTextView"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="email@example.com"
+                            android:text="@string/email_placeholder"
                             android:textColor="@color/text_secondary"
                             android:textSize="13sp" />
                     </LinearLayout>
@@ -108,7 +109,7 @@
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_log_out"
                         app:tint="#EF4444"
-                        android:contentDescription="Logout" />
+                        android:contentDescription="@string/logout" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -132,7 +133,7 @@
                         android:id="@+id/queueTitleTextView"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Photo Queue"
+                        android:text="@string/photo_queue"
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
@@ -144,7 +145,7 @@
                         android:layout_marginTop="8dp"
                         android:background="#F1F5F9"
                         android:padding="12dp"
-                        android:text="No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here."
+                        android:text="@string/no_photos_in_queue"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
 
@@ -153,7 +154,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Next scheduled sync: --:--"
+                        android:text="@string/next_scheduled_sync_empty"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
@@ -181,7 +182,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="Add Photos"
+                        android:text="@string/add_photos"
                         android:textColor="@color/colorPrimary"
                         android:textAllCaps="false"
                         app:strokeColor="@color/colorPrimary"
@@ -195,7 +196,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Sync Now"
+                        android:text="@string/sync_now"
                         android:backgroundTint="@color/colorPrimary"
                         android:textAllCaps="false"
                         app:cornerRadius="12dp" />
@@ -220,7 +221,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Need help? Contact us at"
+                    android:text="@string/need_help"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
@@ -229,7 +230,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="support@eyediatech.com"
+                    android:text="@string/support_email"
                     android:textColor="@color/colorPrimary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
