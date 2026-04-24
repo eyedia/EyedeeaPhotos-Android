@@ -68,6 +68,13 @@ class SettingsActivity : AppCompatActivity() {
         setupWorkManager()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::adapter.isInitialized) {
+            updateSyncStatusUI(adapter.currentList)
+        }
+    }
+
     private fun setupUI() {
         val username = authRepository.getUsername() ?: "User"
         binding.userNameTextView.text = username
@@ -175,6 +182,7 @@ class SettingsActivity : AppCompatActivity() {
                         binding.syncNowButton.text = "Sync Now"
                         binding.syncNowButton.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0EA5E9"))
                         updateNextSyncTime(adapter.itemCount > 0)
+                        updateSyncStatusUI(adapter.currentList)
                     }
                 }
             } else {
@@ -185,6 +193,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateSyncStatusUI(photos: List<QueuedPhoto>) {
+        val isServerDown = getSharedPreferences("EPPrefs", MODE_PRIVATE).getBoolean("server_down", false)
         if (photos.isEmpty()) {
             binding.syncTipTextView.text = "No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here."
             if (!isSyncing) {
@@ -193,8 +202,14 @@ class SettingsActivity : AppCompatActivity() {
             }
         } else {
             binding.syncTipTextView.text = "${photos.size} photos in queue"
-            binding.syncNowButton.isEnabled = true
-            binding.syncNowButton.alpha = 1.0f
+            if (isServerDown && !isSyncing) {
+                binding.syncNowButton.isEnabled = false
+                binding.syncNowButton.alpha = 0.5f
+                binding.syncTipTextView.text = "${photos.size} photos in queue (Server unavailable)"
+            } else {
+                binding.syncNowButton.isEnabled = true
+                binding.syncNowButton.alpha = 1.0f
+            }
         }
     }
 

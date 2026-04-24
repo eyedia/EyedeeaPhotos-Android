@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         private const val WEBSITE_ADDRESS = "website_address"
         private val WEBSITE_ADDRESS_DEFAULT = BuildConfig.VIEW_URL
         private const val REFRESH_INTERVAL_KEY = "refresh_interval"
+        const val SERVER_DOWN = "server_down"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,7 +124,8 @@ class MainActivity : AppCompatActivity() {
         } else { 
             startService(serviceIntent) 
         } 
-        handler.post(runnable)
+        val refreshInterval = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60).toLong() * 60000
+        handler.postDelayed(runnable, refreshInterval)
     }
 
     override fun onPause() {
@@ -137,8 +139,18 @@ class MainActivity : AppCompatActivity() {
     private val runnable = object : Runnable {
         override fun run() {
             val refreshInterval = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60).toLong() * 60000
-            if (webView.url != null) {
-                webView.reload() // or webView.loadUrl(webView.url)
+            val currentUrl = webView.url
+            if (currentUrl != null) {
+                if (currentUrl == "file:///android_asset/error.html") {
+                    val startUrl = if (authRepository.isAuthenticated()) {
+                        BuildConfig.BASE_URL + "/library"
+                    } else {
+                        sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
+                    }
+                    webView.loadUrl(startUrl)
+                } else {
+                    webView.reload()
+                }
             }
             handler.postDelayed(this, refreshInterval) // Refresh every X minutes
         }
@@ -225,6 +237,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d("AUTH_DEBUG", "onPageFinished: $url")
+                
+                if (url != "file:///android_asset/error.html") {
+                    sharedPreferences.edit().putBoolean(SERVER_DOWN, false).apply()
+                }
                 
                 updateSettingsIconVisibility(url)
 
@@ -470,8 +486,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleLoadError() {
         runOnUiThread {
-            Toast.makeText(this, "Could not load website. Please check the address.", Toast.LENGTH_LONG).show()
-            showSettingsDialog()
+            sharedPreferences.edit().putBoolean(SERVER_DOWN, true).apply()
+            webView.loadUrl("file:///android_asset/error.html")
         }
     }
 
