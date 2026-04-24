@@ -3,26 +3,32 @@ package com.eyediatech.eyedeeaphotos.data
 import com.google.gson.annotations.SerializedName
 
 data class LoginRequest(
-    val username: String,
-    val password: String
+    val email: String,
+    val pass: String,
+    @SerializedName("device_name")
+    val deviceName: String
 )
 
 data class LoginResponse(
     val token: String,
     val user: User,
-    val group: String?
+    val group: Group
 )
 
+data class Group(
+    val id: String,
+    val name: String
+)
+
+
 data class User(
-    val id: Int,
+    val id: String,
     val name: String,
     val email: String,
     @SerializedName("current_household_id")
     val currentHouseholdId: String,
     @SerializedName("default_source_id")
-    val defaultSourceId: String?,
-    @SerializedName("current_household_role")
-    val role: String?
+    val defaultSourceId: String
 )
 
 data class DeviceCodeResponse(
@@ -37,8 +43,7 @@ data class DeviceCodeResponse(
     val interval: Int
 )
 
-data class PollResponse(
-    val token: String?,
-    val user: User?,
-    val status: String // "pending", "authorized", "expired"
+data class PollDeviceStatusRequest(
+    @SerializedName("device_code")
+    val deviceCode: String
 )

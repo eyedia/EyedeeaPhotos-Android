@@ -1,116 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="32dp"
-    android:gravity="center"
-    android:background="@android:color/white">
+    android:background="@android:color/white"
+    android:padding="32dp">
 
-    <!-- App Logo -->
+    <!-- Header: Logo and Title -->
     <ImageView
         android:id="@+id/logoImageView"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
         android:src="@mipmap/ic_launcher"
-        android:layout_marginBottom="16dp" />
-
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/titleTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:text="Eyedeea Photos"
-        android:textSize="28sp"
-        android:textStyle="bold"
         android:textColor="@color/black"
-        android:layout_marginBottom="8dp" />
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/logoImageView" />
 
     <TextView
+        android:id="@+id/subtitleTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="Your memories, everywhere."
-        android:textSize="16sp"
         android:textColor="#666"
-        android:layout_marginBottom="48dp" />
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/titleTextView" />
 
-    <!-- Mobile Login Section -->
+    <!-- Mobile Login Section (Centered) -->
     <LinearLayout
         android:id="@+id/loginForm"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:gravity="center"
-        android:visibility="gone">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/browserLoginButton"
-            android:layout_width="wrap_content"
-            android:layout_height="60dp"
-            android:text="Sign In"
-            android:textSize="18sp"
-            android:textAllCaps="false"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@color/white"
-            android:paddingHorizontal="56dp"
-            app:cornerRadius="30dp"
-            app:elevation="12dp"
-            app:rippleColor="#40FFFFFF"
-            android:layout_marginHorizontal="16dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Secure login via Eyedeea Cloud"
-            android:textSize="12sp"
-            android:layout_marginTop="12dp" />
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/subtitleTextView"
+        tools:visibility="gone">
+        <!-- Mobile login button and text here -->
     </LinearLayout>
 
-    <!-- Fire TV QR Code -->
+    <!-- Fire TV Login Section (Side-by-side) -->
     <LinearLayout
         android:id="@+id/qrContainer"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:gravity="center"
-        android:visibility="gone">
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/subtitleTextView"
+        tools:visibility="visible">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Scan to Login"
-            android:textSize="24sp"
-            android:layout_marginBottom="16dp" />
-
+        <!-- Left Side: QR Code -->
         <ImageView
             android:id="@+id/qrImageView"
-            android:layout_width="300dp"
-            android:layout_height="300dp"
-            android:background="#EEE" />
+            android:layout_width="250dp"
+            android:layout_height="250dp"
+            android:layout_marginEnd="32dp"
+            android:scaleType="fitCenter"
+            tools:src="@android:drawable/ic_menu_gallery" />
 
-        <TextView
-            android:id="@+id/userCodeTextView"
+        <!-- Right Side: Instructions and Code -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Code: ----"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp" />
+            android:gravity="start"
+            android:orientation="vertical">
 
-        <ProgressBar
-            android:id="@+id/pollingProgressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="200dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:indeterminate="true" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/scan_to_login"
+                android:textColor="@color/text_primary"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/instructionTextView"
+                android:layout_width="300dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/login_instruction"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/userCodeTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:letterSpacing="0.2"
+                android:paddingVertical="4dp"
+                android:textColor="@color/text_primary"
+                android:textSize="44sp"
+                android:textStyle="bold"
+                tools:text="ABCD-1234" />
+
+            <ProgressBar
+                android:id="@+id/pollingProgressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="8dp"
+                android:indeterminate="false"
+                android:max="300"
+                android:progress="300"
+                android:progressDrawable="@drawable/custom_progress_bar" />
+
+        </LinearLayout>
     </LinearLayout>
 
+    <!-- Generic Loading Spinner -->
     <ProgressBar
         android:id="@+id/loadingProgressBar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone" />
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
 
-</LinearLayout>
+    <!-- Failure Message -->
+    <TextView
+        android:id="@+id/failureTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/login_failure_message"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="18sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/subtitleTextView" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

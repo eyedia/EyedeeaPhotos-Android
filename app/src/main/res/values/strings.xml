@@ -23,4 +23,10 @@
     <string name="support_email">support@eyediatech.com</string>
     <string name="logged_in_as">Logged in as: %s</string>
     <string name="adding_photos">Adding %1$d photos&#8230;</string>
+
+    <!-- Login Screen -->
+    <string name="login_instruction">Or go to eyedeeaphotos.eyediatech.com/activate and enter the code:</string>
+    <string name="user_code_placeholder">----</string>
+    <string name="login_failure_message">Failed to get code. Please try again later.</string>
+    <string name="scan_to_login">Scan to Login</string>
 </resources>

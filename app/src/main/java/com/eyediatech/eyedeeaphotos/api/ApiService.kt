@@ -12,7 +12,7 @@ interface ApiService {
     suspend fun getDeviceCode(): Response<DeviceCodeResponse>
 
     @POST("/api/v1/auth/device")
-    suspend fun pollDeviceStatus(@Query("device_code") deviceCode: String): Response<LoginResponse>
+    suspend fun pollDeviceStatus(@Body request: PollDeviceStatusRequest): Response<LoginResponse>
 
     @GET("/api/v1/{householdId}/sources")
     suspend fun getSources(

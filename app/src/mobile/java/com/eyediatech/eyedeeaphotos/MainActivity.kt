@@ -284,39 +284,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Remote control handling for Fire TV
-        webView.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                when (keyCode) {
-                    KeyEvent.KEYCODE_DPAD_CENTER,
-                    KeyEvent.KEYCODE_ENTER -> {
-                        // Simulate click on focused element
-                        webView.evaluateJavascript("""
-                            var activeElement = document.activeElement;
-                            if (activeElement) {
-                                activeElement.click();
-                            }
-                        """.trimIndent(), null)
-                        return@setOnKeyListener true
-                    }
-                    KeyEvent.KEYCODE_MENU -> {
-                        startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
-                        return@setOnKeyListener true
-                    }
-                    KeyEvent.KEYCODE_BACK -> {
-                        val currentUrl = webView.url
-                        if (currentUrl?.contains("/view", ignoreCase = true) == true) {
-                            webView.loadUrl(BuildConfig.BASE_URL + "/library")
-                            return@setOnKeyListener true
-                        }
-                        if (webView.canGoBack()) {
-                            webView.goBack()
-                        } else {
-                            finish()
-                        }
-                        return@setOnKeyListener true
-                    }
-                }
+        webView.setOnKeyListener { _, keyCode, _ ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
+                webView.goBack()
+                return@setOnKeyListener true
             }
             false
         }
