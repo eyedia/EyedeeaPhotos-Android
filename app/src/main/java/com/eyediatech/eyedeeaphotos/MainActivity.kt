@@ -82,8 +82,9 @@ class MainActivity : AppCompatActivity() {
         // Get saved IP or use default
         val savedIp = sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
         
+        val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
         val startUrl = if (authRepository.isAuthenticated()) {
-            BuildConfig.BASE_URL + "/library"
+            "$baseUrl/library"
         } else {
             savedIp
         }
@@ -118,8 +119,11 @@ class MainActivity : AppCompatActivity() {
         } else { 
             startService(serviceIntent) 
         } 
-        val refreshInterval = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60).toLong() * 60000
-        handler.postDelayed(runnable, refreshInterval)
+        val refreshIntervalMinutes = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60)
+        if (refreshIntervalMinutes > 0) {
+            val refreshInterval = refreshIntervalMinutes.toLong() * 60000
+            handler.postDelayed(runnable, refreshInterval)
+        }
     }
 
     override fun onPause() {
@@ -132,12 +136,16 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val runnable = object : Runnable {
         override fun run() {
-            val refreshInterval = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60).toLong() * 60000
+            val refreshIntervalMinutes = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60)
+            if (refreshIntervalMinutes <= 0) return // Prevent infinite loop if interval is 0
+            
+            val refreshInterval = refreshIntervalMinutes.toLong() * 60000
             val currentUrl = webView.url
             if (currentUrl != null) {
                 if (currentUrl == "file:///android_asset/error.html") {
+                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
                     val startUrl = if (authRepository.isAuthenticated()) {
-                        BuildConfig.BASE_URL + "/library"
+                        "$baseUrl/library"
                     } else {
                         sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
                     }
@@ -236,10 +244,9 @@ class MainActivity : AppCompatActivity() {
                 if (authRepository.isAuthenticated()) {
                     val isAtLogin = url?.contains("/auth/login") == true
                     val isAtRoot = url == BuildConfig.BASE_URL || url == "${BuildConfig.BASE_URL}/"
-                    val isAtView = url?.contains("/view") == true
                     
-                    if (isAtLogin || isAtRoot || isAtView) {
-                        Log.d("AUTH_DEBUG", "Detected login/root/view page while authenticated. Injecting token.")
+                    if (isAtLogin || isAtRoot) {
+                        Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token.")
                         injectTokenIntoLocalStorage()
                     }
                 }
