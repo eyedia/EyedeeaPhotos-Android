@@ -12,12 +12,7 @@ data class LoginRequest(
 data class LoginResponse(
     val token: String,
     val user: User,
-    val group: Group
-)
-
-data class Group(
-    val id: String,
-    val name: String
+    val group: String
 )
 
 

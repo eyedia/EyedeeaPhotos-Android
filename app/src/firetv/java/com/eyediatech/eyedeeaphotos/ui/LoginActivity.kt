@@ -102,7 +102,7 @@ class LoginActivity : AppCompatActivity() {
                             val userJson = Gson().toJson(authData.user)
                             authRepository.saveAuthData(
                                 authData.token, authData.user.currentHouseholdId,
-                                authData.user.defaultSourceId, authData.user.name, userJson, authData.group.name
+                                authData.user.defaultSourceId, authData.user.name, userJson, authData.group
                             )
                             navigateToMain()
                             break
