@@ -25,12 +25,16 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
+import com.eyediatech.eyedeeaphotos.repository.PhotoRepository
+import com.eyediatech.eyedeeaphotos.data.AppDatabase
 import com.eyediatech.eyedeeaphotos.ui.LoginActivity
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -40,6 +44,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var authRepository: AuthRepository
+    private lateinit var photoRepository: PhotoRepository
+    private var settingsIcon: ImageView? = null
+    private var settingsButtonContainer: View? = null
+    private var queueBadge: TextView? = null
     private val storagePermissionRequestCode = 1001
 
     // For handling downloads after permission grant
@@ -136,6 +144,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateSettingsIconVisibility(url: String?) {
+        val isAtView = url?.contains("/view", ignoreCase = true) == true
+        Log.d("UI_DEBUG", "Updating icon visibility. URL: $url, isAtView: $isAtView")
+        val visibility = if (isAtView) View.GONE else View.VISIBLE
+        settingsIcon?.visibility = visibility
+        settingsButtonContainer?.visibility = visibility
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView = findViewById(R.id.webView)
@@ -167,21 +183,51 @@ class MainActivity : AppCompatActivity() {
 
         // --- Settings Icon for Mobile Flavor ---
         if (BuildConfig.FLAVOR == "mobile") {
-            val resId = resources.getIdentifier("settingsIcon", "id", packageName)
-            if (resId != 0) {
-                val settingsIcon = findViewById<ImageView>(resId)
-                settingsIcon.setOnClickListener {
+            val containerId = resources.getIdentifier("settingsButtonContainer", "id", packageName)
+            if (containerId != 0) {
+                settingsButtonContainer = findViewById(containerId)
+                settingsIcon = findViewById(resources.getIdentifier("settingsIcon", "id", packageName))
+                queueBadge = findViewById(resources.getIdentifier("queueBadge", "id", packageName))
+                
+                settingsButtonContainer?.setOnClickListener {
                     startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
+                }
+
+                // Observe queue count
+                photoRepository = PhotoRepository(AppDatabase.getDatabase(this).photoDao())
+                lifecycleScope.launch {
+                    photoRepository.allQueuedPhotos.collectLatest { photos ->
+                        if (photos.isNotEmpty()) {
+                            queueBadge?.visibility = View.VISIBLE
+                            queueBadge?.text = if (photos.size > 99) "99+" else photos.size.toString()
+                            settingsIcon?.alpha = 1.0f
+                        } else {
+                            queueBadge?.visibility = View.GONE
+                            settingsIcon?.alpha = 0.4f
+                        }
+                    }
                 }
             }
         }
 
         // Custom WebViewClient to handle downloads and navigation
         webView.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                updateSettingsIconVisibility(url)
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                updateSettingsIconVisibility(url)
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.d("AUTH_DEBUG", "onPageFinished: $url")
                 
+                updateSettingsIconVisibility(url)
+
                 if (authRepository.isAuthenticated()) {
                     val isAtLogin = url?.contains("/auth/login") == true
                     val isAtRoot = url == BuildConfig.BASE_URL || url == "${BuildConfig.BASE_URL}/"
@@ -248,6 +294,11 @@ class MainActivity : AppCompatActivity() {
                         return@setOnKeyListener true
                     }
                     KeyEvent.KEYCODE_BACK -> {
+                        val currentUrl = webView.url
+                        if (currentUrl?.contains("/view", ignoreCase = true) == true) {
+                            webView.loadUrl(BuildConfig.BASE_URL + "/library")
+                            return@setOnKeyListener true
+                        }
                         if (webView.canGoBack()) {
                             webView.goBack()
                         } else {
@@ -311,7 +362,7 @@ class MainActivity : AppCompatActivity() {
         userTextView.text = "Logged in as: ${authRepository.getUsername()}"
 
         val alertDialog = AlertDialog.Builder(this)
-            .setTitle("Settings")
+            .setTitle(R.string.account_uploads)
             .setView(dialogView)
             .create()
 

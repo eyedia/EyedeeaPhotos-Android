@@ -112,18 +112,36 @@ class ShareActivity : AppCompatActivity() {
 
     private suspend fun copyToInternalStorage(uri: Uri): File? = withContext(Dispatchers.IO) {
         try {
-            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(contentResolver.getType(uri)) ?: "jpg"
-            val fileName = "queued_${System.currentTimeMillis()}_${(0..1000).random()}.$extension"
+            var fileName = ""
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst()) {
+                    fileName = cursor.getString(nameIndex)
+                }
+            }
+
+            if (fileName.isEmpty()) {
+                val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(contentResolver.getType(uri)) ?: "jpg"
+                fileName = "photo_${System.currentTimeMillis()}_${(0..1000).random()}.$extension"
+            }
+
             val fileDir = File(filesDir, "queue")
             if (!fileDir.exists()) fileDir.mkdirs()
             
-            val destFile = File(fileDir, fileName)
+            // Handle duplicate names in internal storage
+            var finalFile = File(fileDir, fileName)
+            if (finalFile.exists()) {
+                val nameWithoutExt = fileName.substringBeforeLast(".")
+                val ext = fileName.substringAfterLast(".", "jpg")
+                finalFile = File(fileDir, "${nameWithoutExt}_${System.currentTimeMillis()}.$ext")
+            }
+
             contentResolver.openInputStream(uri)?.use { input ->
-                destFile.outputStream().use { output ->
+                finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             }
-            destFile
+            finalFile
         } catch (e: Exception) {
             Log.e("SHARE_ERROR", "Error copying file", e)
             null

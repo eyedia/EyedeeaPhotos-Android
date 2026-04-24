@@ -204,18 +204,21 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         binding.nextSyncTextView.visibility = View.VISIBLE
-        WorkManager.getInstance(this).getWorkInfosForUniqueWorkLiveData("PeriodicSync").observe(this) { workInfos ->
-            val workInfo = workInfos?.firstOrNull()
-            if (workInfo != null && workInfo.state != WorkInfo.State.CANCELLED) {
-                // Approximate next sync based on 1 hour interval
-                val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-                val calendar = Calendar.getInstance()
-                calendar.add(Calendar.HOUR, 1)
-                binding.nextSyncTextView.text = "Next scheduled sync: ${sdf.format(calendar.time)}"
-            } else {
-                binding.nextSyncTextView.text = "Sync not scheduled"
-            }
+        
+        val syncMinute = getSyncStartMinute()
+        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+        val now = Calendar.getInstance()
+        val nextSync = Calendar.getInstance().apply {
+            set(Calendar.MINUTE, syncMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
+        
+        if (nextSync.before(now)) {
+            nextSync.add(Calendar.HOUR_OF_DAY, 1)
+        }
+        
+        binding.nextSyncTextView.text = "Next scheduled sync: ${sdf.format(nextSync.time)}"
     }
 
     private fun setupWorkManager() {
@@ -223,8 +226,12 @@ class SettingsActivity : AppCompatActivity() {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
+        val syncMinute = getSyncStartMinute()
+        val initialDelayMs = calculateInitialDelay(syncMinute)
+
         val periodicWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
             .setConstraints(constraints)
+            .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
             .addTag("SyncTag")
             .addTag("PeriodicSync")
             .build()
@@ -234,6 +241,29 @@ class SettingsActivity : AppCompatActivity() {
             ExistingPeriodicWorkPolicy.KEEP,
             periodicWorkRequest
         )
+    }
+
+    private fun getSyncStartMinute(): Int {
+        val prefs = getSharedPreferences("SyncPrefs", MODE_PRIVATE)
+        var minute = prefs.getInt("sync_minute", -1)
+        if (minute == -1) {
+            minute = (0..59).random()
+            prefs.edit().putInt("sync_minute", minute).apply()
+        }
+        return minute
+    }
+
+    private fun calculateInitialDelay(targetMinute: Int): Long {
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.MINUTE, targetMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (target.before(now)) {
+            target.add(Calendar.HOUR_OF_DAY, 1)
+        }
+        return target.timeInMillis - now.timeInMillis
     }
 
     private fun triggerManualSync() {
@@ -276,17 +306,35 @@ class SettingsActivity : AppCompatActivity() {
 
     private suspend fun copyToInternalStorage(uri: Uri): File? = withContext(Dispatchers.IO) {
         try {
-            val fileName = "manual_${System.currentTimeMillis()}_${(0..1000).random()}.jpg"
+            var fileName = ""
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst()) {
+                    fileName = cursor.getString(nameIndex)
+                }
+            }
+            
+            if (fileName.isEmpty()) {
+                fileName = "photo_${System.currentTimeMillis()}_${(0..1000).random()}.jpg"
+            }
+            
             val fileDir = File(filesDir, "queue")
             if (!fileDir.exists()) fileDir.mkdirs()
             
-            val destFile = File(fileDir, fileName)
+            // Handle duplicate names in internal storage by appending timestamp if needed
+            var finalFile = File(fileDir, fileName)
+            if (finalFile.exists()) {
+                val nameWithoutExt = fileName.substringBeforeLast(".")
+                val ext = fileName.substringAfterLast(".", "jpg")
+                finalFile = File(fileDir, "${nameWithoutExt}_${System.currentTimeMillis()}.$ext")
+            }
+
             contentResolver.openInputStream(uri)?.use { input ->
-                destFile.outputStream().use { output ->
+                finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             }
-            destFile
+            finalFile
         } catch (e: Exception) {
             null
         }

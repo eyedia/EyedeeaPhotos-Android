@@ -34,7 +34,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.EyedeeaPhotos">
+            android:theme="@style/Theme.EyedeeaPhotos"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <!-- Intent filters are now defined in flavor-specific manifests -->
         </activity>
 
