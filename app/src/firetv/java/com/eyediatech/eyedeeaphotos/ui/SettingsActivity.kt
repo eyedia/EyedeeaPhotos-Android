@@ -2,14 +2,14 @@ package com.eyediatech.eyedeeaphotos.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.eyediatech.eyedeeaphotos.databinding.ActivitySettingsBinding
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import kotlinx.coroutines.launch
 
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : FragmentActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var authRepository: AuthRepository
@@ -31,11 +31,6 @@ class SettingsActivity : AppCompatActivity() {
         binding.userEmailTextView.text = authRepository.getEmail() ?: "No Email"
 
         binding.logoutButton.setOnClickListener { logout() }
-        
-        binding.logoLinkButton.setOnClickListener {
-            val browserIntent = Intent(Intent.ACTION_VIEW, "https://eyedeeaphotos.eyediatech.com/".toUri())
-            startActivity(browserIntent)
-        }
     }
 
     private fun logout() {

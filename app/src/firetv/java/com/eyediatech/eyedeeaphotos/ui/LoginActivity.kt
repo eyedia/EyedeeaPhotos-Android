@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.eyediatech.eyedeeaphotos.BuildConfig
 import com.eyediatech.eyedeeaphotos.MainActivity
@@ -19,7 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : FragmentActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var authRepository: AuthRepository

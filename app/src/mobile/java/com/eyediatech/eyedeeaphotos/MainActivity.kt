@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var authRepository: AuthRepository
     private lateinit var photoRepository: PhotoRepository
+    private var tokenInjectionCount = 0
     private var settingsIcon: ImageView? = null
     private var settingsButtonContainer: View? = null
     private var queueBadge: TextView? = null
@@ -243,7 +244,8 @@ class MainActivity : AppCompatActivity() {
 
                 if (authRepository.isAuthenticated()) {
                     val isAtLogin = url?.contains("/auth/login") == true
-                    val isAtRoot = url == BuildConfig.BASE_URL || url == "${BuildConfig.BASE_URL}/"
+                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+                    val isAtRoot = url == BuildConfig.BASE_URL || url == "$baseUrl/" || url == baseUrl
                     
                     if (isAtLogin || isAtRoot) {
                         Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token.")
@@ -332,11 +334,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun injectTokenIntoLocalStorage() {
+        if (tokenInjectionCount > 2) {
+            Log.e("AUTH_DEBUG", "Token injection loop detected. Logging out.")
+            authRepository.clearAuthData()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+        tokenInjectionCount++
+
         val token = authRepository.getToken() ?: return
         val refreshToken = authRepository.getRefreshToken() ?: ""
         val userJson = authRepository.getUserJson() ?: "{}"
         val role = authRepository.getGroup() ?: "user"
-        val libraryUrl = BuildConfig.BASE_URL + "/library"
+        val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+        val libraryUrl = "$baseUrl/library"
 
         // Escape backslashes and single quotes for JS
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
@@ -351,7 +363,7 @@ class MainActivity : AppCompatActivity() {
                     localStorage.setItem('auth_user', '$escapedUserJson');
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');
-                    window.location.href = '$libraryUrl';
+                    window.location.replace('$libraryUrl');
                 } catch (e) {
                     console.error('Injection failed: ' + e);
                 }

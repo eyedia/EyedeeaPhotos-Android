@@ -5,15 +5,16 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import com.eyediatech.eyedeeaphotos.databinding.ActivityMainBinding
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.ui.LoginActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var authRepository: AuthRepository
+    private var tokenInjectionCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +64,8 @@ class MainActivity : AppCompatActivity() {
                 
                 if (authRepository.isAuthenticated()) {
                     val isAtLogin = url?.contains("/auth/login") == true
-                    val isAtRoot = url == BuildConfig.BASE_URL || url == "${BuildConfig.BASE_URL}/"
+                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+                    val isAtRoot = url == BuildConfig.BASE_URL || url == "$baseUrl/" || url == baseUrl
                     
                     if (isAtLogin || isAtRoot) {
                         Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token.")
@@ -83,16 +85,24 @@ class MainActivity : AppCompatActivity() {
 
         // Start at the view page. If not authenticated, the web app will redirect to login/root,
         // which we catch in onPageFinished, inject the token, and redirect back.
-        val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-        binding.webView.loadUrl("$baseUrl/view")
+        binding.webView.loadUrl(BuildConfig.VIEW_URL)
     }
 
     private fun injectTokenIntoLocalStorage(webView: WebView?) {
+        if (tokenInjectionCount > 2) {
+            Log.e("AUTH_DEBUG", "Token injection loop detected. Logging out.")
+            authRepository.clearAuthData()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+        tokenInjectionCount++
+
         val token = authRepository.getToken() ?: return
         val refreshToken = authRepository.getRefreshToken() ?: ""
         val userJson = authRepository.getUserJson() ?: "{}"
         val role = authRepository.getGroup() ?: "user"
-        val viewUrl = BuildConfig.BASE_URL + "/view"
+        val viewUrl = BuildConfig.VIEW_URL
 
         // Escape backslashes and single quotes for JS
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
@@ -107,7 +117,7 @@ class MainActivity : AppCompatActivity() {
                     localStorage.setItem('auth_user', '$escapedUserJson');
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');
-                    window.location.href = '$viewUrl';
+                    window.location.replace('$viewUrl');
                 } catch (e) {
                     console.error('Injection failed: ' + e);
                 }
