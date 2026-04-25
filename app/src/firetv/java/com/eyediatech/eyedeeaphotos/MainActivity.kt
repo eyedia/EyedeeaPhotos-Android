@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun injectTokenIntoLocalStorage(webView: WebView?) {
         val token = authRepository.getToken() ?: return
+        val refreshToken = authRepository.getRefreshToken() ?: ""
         val userJson = authRepository.getUserJson() ?: "{}"
         val role = authRepository.getGroup() ?: "user"
         val viewUrl = BuildConfig.BASE_URL + "/view"
@@ -100,6 +101,9 @@ class MainActivity : AppCompatActivity() {
             (function() {
                 try {
                     localStorage.setItem('auth_token', '$token');
+                    if ('$refreshToken' !== '') {
+                        localStorage.setItem('refresh_token', '$refreshToken');
+                    }
                     localStorage.setItem('auth_user', '$escapedUserJson');
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');

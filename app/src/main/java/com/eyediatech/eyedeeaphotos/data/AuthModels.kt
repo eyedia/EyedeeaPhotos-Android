@@ -11,6 +11,8 @@ data class LoginRequest(
 
 data class LoginResponse(
     val token: String,
+    @SerializedName("refresh_token")
+    val refreshToken: String?,
     val user: User,
     val group: String
 )
@@ -41,4 +43,15 @@ data class DeviceCodeResponse(
 data class PollDeviceStatusRequest(
     @SerializedName("device_code")
     val deviceCode: String
+)
+
+data class RefreshRequest(
+    @SerializedName("refresh_token")
+    val refreshToken: String
+)
+
+data class RefreshResponse(
+    val token: String,
+    @SerializedName("refresh_token")
+    val refreshToken: String?
 )

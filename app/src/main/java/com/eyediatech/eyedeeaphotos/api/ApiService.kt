@@ -8,6 +8,9 @@ interface ApiService {
     @POST("/api/v1/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
+    @POST("/api/v1/auth/refresh")
+    fun refreshSync(@Body request: RefreshRequest): retrofit2.Call<RefreshResponse>
+
     @GET("/api/v1/auth/device")
     suspend fun getDeviceCode(): Response<DeviceCodeResponse>
 

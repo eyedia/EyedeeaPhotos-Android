@@ -36,6 +36,7 @@ class LoginActivity : AppCompatActivity() {
     private fun handleDeepLink(intent: Intent) {
         val data: Uri? = intent.data
         if (data != null && data.scheme == "eyedeea" && data.host == "auth") {
+            val refreshToken = data.getQueryParameter("refresh_token")
             val token = data.getQueryParameter("token")
             val name = data.getQueryParameter("name")
             val householdId = data.getQueryParameter("household_id")
@@ -44,7 +45,7 @@ class LoginActivity : AppCompatActivity() {
             val group = data.getQueryParameter("group")
 
             if (!token.isNullOrBlank() && !name.isNullOrBlank() && !householdId.isNullOrBlank()) {
-                authRepository.saveAuthData(token, householdId, sourceId, name, userJson ?: "", group)
+                authRepository.saveAuthData(token, refreshToken, householdId, sourceId, name, userJson ?: "", group)
                 navigateToMain()
             } else {
                 Toast.makeText(this, "Login failed: Missing data", Toast.LENGTH_SHORT).show()

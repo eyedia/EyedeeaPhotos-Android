@@ -1,6 +1,8 @@
 package com.eyediatech.eyedeeaphotos.api
 
+import android.content.Context
 import com.eyediatech.eyedeeaphotos.BuildConfig
+import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -13,16 +15,31 @@ object RetrofitClient {
         level = HttpLoggingInterceptor.Level.HEADERS
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .build()
+    private var okHttpClient: OkHttpClient? = null
+    private var apiService: ApiService? = null
 
-    val instance: ApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
+    fun init(context: Context) {
+        if (okHttpClient == null) {
+            val authRepository = AuthRepository(context.applicationContext)
+            val authInterceptor = AuthInterceptor(context.applicationContext, authRepository)
+            
+            okHttpClient = OkHttpClient.Builder()
+                .addInterceptor(authInterceptor)
+                .addInterceptor(loggingInterceptor)
+                .build()
+        }
     }
+
+    val instance: ApiService
+        get() {
+            if (apiService == null) {
+                apiService = Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .client(okHttpClient ?: OkHttpClient.Builder().addInterceptor(loggingInterceptor).build())
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                    .create(ApiService::class.java)
+            }
+            return apiService!!
+        }
 }
