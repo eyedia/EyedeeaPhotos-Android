@@ -13,7 +13,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.*
@@ -23,6 +22,7 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -288,13 +288,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView.setOnKeyListener { _, keyCode, _ ->
-            if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-                webView.goBack()
-                return@setOnKeyListener true
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val history = webView.copyBackForwardList()
+                val currentIndex = history.currentIndex
+                Log.d("BACK_BTN", "handleOnBackPressed. History size: ${history.size}, currentIndex: $currentIndex, currentUrl: ${webView.url}")
+                
+                if (webView.canGoBack() && currentIndex > 0) {
+                    val previousUrl = history.getItemAtIndex(currentIndex - 1).url
+                    Log.d("BACK_BTN", "Target previous URL: $previousUrl")
+                    
+                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+                    val isPreviousLogin = previousUrl.contains("/auth/login") == true
+                    val isPreviousRoot = previousUrl == BuildConfig.BASE_URL || previousUrl == "$baseUrl/" || previousUrl == baseUrl
+                    
+                    if (authRepository.isAuthenticated() && (isPreviousLogin || isPreviousRoot)) {
+                        Log.d("BACK_BTN", "Prevented redirect loop to login/root. Exiting app instead.")
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    } else {
+                        Log.d("BACK_BTN", "Going back in WebView")
+                        webView.goBack()
+                    }
+                } else {
+                    Log.d("BACK_BTN", "Exiting app directly")
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
             }
-            false
-        }
+        })
     }
 
     private fun handleDownload(url: String, userAgent: String, contentDisposition: String, mimetype: String) {
