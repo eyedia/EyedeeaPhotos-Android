@@ -199,6 +199,8 @@ class MainActivity : AppCompatActivity() {
         settingsIcon = findViewById(R.id.settingsIcon)
         queueBadge = findViewById(R.id.queueBadge)
 
+        settingsButtonContainer?.bringToFront()
+
         if (settingsButtonContainer != null) {
             settingsButtonContainer?.setOnClickListener {
                 startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))

@@ -54,6 +54,25 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private val requestLocationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        pickImagesLauncher.launch("image/*")
+    }
+
+    private fun checkLocationPermissionAndPickImages() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_MEDIA_LOCATION
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLocationPermissionLauncher.launch(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
+        } else {
+            pickImagesLauncher.launch("image/*")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySettingsBinding.inflate(layoutInflater)
@@ -70,6 +89,14 @@ class SettingsActivity : AppCompatActivity() {
         setupRecyclerView()
         observeData()
         setupWorkManager()
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        if (item.itemId == android.R.id.home) {
+            finish()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     override fun onResume() {
@@ -94,7 +121,7 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.addPhotosButton.setOnClickListener {
             if (!isSyncing) {
-                pickImagesLauncher.launch("image/*")
+                checkLocationPermissionAndPickImages()
             }
         }
 
@@ -159,9 +186,8 @@ class SettingsActivity : AppCompatActivity() {
                  // We can use the tag 'ManualSync' specifically if we added it.
                  val isManualSuccess = succeededWork.tags.contains("ManualSync")
                  if (isManualSuccess) {
-                     Toast.makeText(this@SettingsActivity, "Sync completed successfully", Toast.LENGTH_SHORT).show()
-                     finish()
-                     return@observe
+                     Toast.makeText(this@SettingsActivity, "Manual sync completed successfully", Toast.LENGTH_SHORT).show()
+                     // Let's not finish(), so the user can see the queue.
                  }
             }
 
@@ -348,7 +374,27 @@ class SettingsActivity : AppCompatActivity() {
                 finalFile = File(fileDir, "${nameWithoutExt}_${System.currentTimeMillis()}.$ext")
             }
 
-            contentResolver.openInputStream(uri)?.use { input ->
+            var finalUri = uri
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        this@SettingsActivity,
+                        android.Manifest.permission.ACCESS_MEDIA_LOCATION
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    try {
+                        // Only attempt to get the original URI if the authority is MediaStore.
+                        // URIs from the photo picker may have different authorities and temporary grants.
+                        if (uri.authority == android.provider.MediaStore.AUTHORITY) {
+                            finalUri = android.provider.MediaStore.setRequireOriginal(uri)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsActivity", "Error setting require original, falling back to original URI", e)
+                        finalUri = uri
+                    }
+                }
+            }
+
+            contentResolver.openInputStream(finalUri)?.use { input ->
                 finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }

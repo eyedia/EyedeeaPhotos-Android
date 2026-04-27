@@ -29,4 +29,13 @@
     <string name="user_code_placeholder">----</string>
     <string name="login_failure_message">Failed to get code. Please try again later.</string>
     <string name="scan_to_login">Scan to Login</string>
+    <string name="login_button_text">Login</string>
+
+    <!-- Share Activity -->
+    <string name="queuing_photos">Queuing photos…</string>
+    <string name="photos_queued_progress">%1$d/%2$d photos queued</string>
+    <string name="photos_added_to_queue">Photos added to queue</string>
+    <string name="unsupported_files_ignored">Unsupported files ignored</string>
+    <string name="unsupported_files_ignored_message">Only photos are supported and will be queued for upload.</string>
+    <string name="please_log_in_first">Please log in first</string>
 </resources>

@@ -59,7 +59,8 @@
             android:id="@+id/browserLoginButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Login with Browser" />
+            android:backgroundTint="#0773AC"
+            android:text="@string/login_button_text" />
     </LinearLayout>
 
     <!-- Fire TV Login Section (Side-by-side) -->

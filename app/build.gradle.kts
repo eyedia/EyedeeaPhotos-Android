@@ -49,7 +49,7 @@ android {
     }
 
     sourceSets {
-        getByName("main") { 
+        getByName("main") {
             java.srcDirs("src/main/java")
         }
         getByName("firetv") {
@@ -60,6 +60,7 @@ android {
         getByName("mobile") {
             java.srcDirs("src/mobile/java")
             res.srcDirs("src/mobile/res")
+            manifest.srcFile("src/mobile/AndroidManifest.xml")
         }
     }
 
