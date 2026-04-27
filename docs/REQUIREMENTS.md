@@ -25,6 +25,7 @@
   - Specialized handler for system-wide "Share" actions.
   - Strict filtering: Accepts only `image/*` MIME types, rejecting videos and other documents.
   - Seamlessly queues shared items into the local database for background processing.
+  - Must NOT alter or prefix original file names (e.g., no "queued_" or "photo_" prefixes) to maintain original naming during uploads.
 - **Automated Scheduler:**
   - Robust background syncing executed every 1 hour via `WorkManager`.
   - Automatic retry logic and connectivity awareness.

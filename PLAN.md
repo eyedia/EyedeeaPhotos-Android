@@ -64,7 +64,7 @@
 ### Phase 4: Share Flow Redirection
 - [ ] **ShareActivity Update:** 
     - Intercept `ACTION_SEND` / `ACTION_SEND_MULTIPLE`.
-    - Copy shared files to app's cache/internal dir (so they persist).
+    - Copy shared files to app's cache/internal dir (so they persist). Ensure the original file name is kept (do not prefix with "queued_").
     - Add entries to Room DB.
     - Success animation and redirection to Settings.
 
