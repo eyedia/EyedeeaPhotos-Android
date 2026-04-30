@@ -59,19 +59,28 @@ class MainActivity : FragmentActivity() {
         }
 
         binding.webView.webViewClient = object : android.webkit.WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                
+            private fun checkUrlAndInjectToken(view: WebView?, url: String?) {
                 if (authRepository.isAuthenticated()) {
                     val isAtLogin = url?.contains("/auth/login") == true
                     val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val isAtRoot = url == BuildConfig.BASE_URL || url == "$baseUrl/" || url == baseUrl
+                    val urlWithoutQuery = url?.substringBefore("?")?.removeSuffix("/")
+                    val isAtRoot = urlWithoutQuery == baseUrl
                     
                     if (isAtLogin || isAtRoot) {
-                        Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token.")
+                        Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token. URL: $url")
                         injectTokenIntoLocalStorage(view)
                     }
                 }
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                checkUrlAndInjectToken(view, url)
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                checkUrlAndInjectToken(view, url)
             }
             
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {

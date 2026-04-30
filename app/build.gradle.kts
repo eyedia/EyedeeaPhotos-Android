@@ -24,7 +24,7 @@ android {
     signingConfigs {
         create("release") {
             if (project.extra.has("keyAlias") && project.extra.has("keystorePassword") && project.extra.has("keyPassword")) {
-                storeFile = file("D:/Work/Eyedeea-Core/android/eyedeea_photos_v2.jks")
+                storeFile = file("E:/Work/Eyedeea-Core/android/eyedeea_photos_v3.jks")
                 storePassword = project.extra.get("keystorePassword") as String
                 keyAlias = project.extra.get("keyAlias") as String
                 keyPassword = project.extra.get("keyPassword") as String
