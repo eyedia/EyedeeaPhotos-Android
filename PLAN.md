@@ -2,7 +2,7 @@
 
 ## 1. Requirements Overview
 - **User Authentication:** Display name/email, Logout/Login buttons.
-- **Website Link:** [Visit Website](https://eyedeeaphotos.eyediatech.com/)
+- **Website Link:** [Visit Website](https://www.eyedeeaphotos.com/)
 - **Photo Queue (Android Only):**
     - Local queue for photos shared with the app.
     - Persistent storage for the queue (Room DB).

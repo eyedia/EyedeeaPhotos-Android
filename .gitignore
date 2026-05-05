@@ -18,3 +18,4 @@
 # App specific
 /app/build/
 /app/src/main/ic_launcher-playstore.png
+/release/
