@@ -78,6 +78,28 @@ class MainActivity : FragmentActivity() {
                 checkUrlAndInjectToken(view, url)
             }
 
+            override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                super.onReceivedError(view, request, error)
+                val msg = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    error?.description.toString()
+                } else {
+                    "Error loading page"
+                }
+                Log.e("WEBVIEW_DEBUG", "Error: $msg")
+            }
+
+            override fun onReceivedSslError(view: WebView?, handler: android.webkit.SslErrorHandler?, error: android.net.http.SslError?) {
+                Log.e("WEBVIEW_DEBUG", "SSL Error: ${error?.primaryError}")
+                // It is unsafe to unconditionally call handler.proceed() in release builds.
+                // It's common for Fire TVs to have the wrong date/time, leading to ERR_CERT_DATE_INVALID.
+                android.widget.Toast.makeText(
+                    this@MainActivity, 
+                    "Security/SSL Error. Please check your device's date and time.", 
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                handler?.cancel()
+            }
+
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 checkUrlAndInjectToken(view, url)
