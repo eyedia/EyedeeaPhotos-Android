@@ -186,6 +186,9 @@ class MainActivity : AppCompatActivity() {
 
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
+        // Custom User Agent
+        webSettings.userAgentString = com.eyediatech.eyedeeaphotos.utils.UserAgentUtils.getUserAgent(this)
+
         // Enable maximum performance
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 

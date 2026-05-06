@@ -46,6 +46,7 @@ class MainActivity : FragmentActivity() {
         webSettings.domStorageEnabled = true
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
+        webSettings.userAgentString = com.eyediatech.eyedeeaphotos.utils.UserAgentUtils.getUserAgent(this)
         
         // binding.webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
 

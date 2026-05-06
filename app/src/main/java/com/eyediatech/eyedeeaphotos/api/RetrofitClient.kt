@@ -23,7 +23,16 @@ object RetrofitClient {
             val authRepository = AuthRepository(context.applicationContext)
             val authInterceptor = AuthInterceptor(context.applicationContext, authRepository)
             
+            val userAgent = com.eyediatech.eyedeeaphotos.utils.UserAgentUtils.getUserAgent(context)
+            val userAgentInterceptor = okhttp3.Interceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", userAgent)
+                    .build()
+                chain.proceed(request)
+            }
+            
             okHttpClient = OkHttpClient.Builder()
+                .addInterceptor(userAgentInterceptor)
                 .addInterceptor(authInterceptor)
                 .addInterceptor(loggingInterceptor)
                 .build()
