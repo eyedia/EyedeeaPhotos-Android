@@ -168,10 +168,10 @@
             android:id="@+id/failureTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="It looks like no one entered the code.\nTap Refresh to try again."
+            android:text="@string/login_no_activity_message"
             android:textAlignment="center"
-            android:textColor="@color/black"
-            android:textSize="18sp"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
             android:layout_marginBottom="16dp" />
 
         <Button
@@ -180,7 +180,8 @@
             android:layout_height="wrap_content"
             android:backgroundTint="#0773AC"
             android:textColor="@android:color/white"
-            android:text="Refresh"
+            android:text="@string/refresh_button"
+            android:textAllCaps="false"
             android:focusable="true"
             android:focusableInTouchMode="true" />
     </LinearLayout>

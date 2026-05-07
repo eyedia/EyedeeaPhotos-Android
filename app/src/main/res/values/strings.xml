@@ -28,6 +28,8 @@
     <string name="login_instruction">Or go to\neyedeeaphotos.com/activate\nand enter the code:</string>
     <string name="user_code_placeholder">----</string>
     <string name="login_failure_message">Failed to get code. Please try again later.</string>
+    <string name="login_no_activity_message">It looks like no one entered the code.\nTap Refresh to try again.</string>
+    <string name="refresh_button">Refresh</string>
     <string name="scan_to_login">Scan to Login</string>
     <string name="login_button_text">Login</string>
 
