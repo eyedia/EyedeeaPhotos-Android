@@ -11,9 +11,11 @@ interface ApiService {
     @POST("/api/v1/auth/refresh")
     fun refreshSync(@Body request: RefreshRequest): retrofit2.Call<RefreshResponse>
 
+    @Headers("Accept: application/json")
     @GET("/api/v1/auth/device")
     suspend fun getDeviceCode(): Response<DeviceCodeResponse>
 
+    @Headers("Accept: application/json", "Connection: close")
     @POST("/api/v1/auth/device")
     suspend fun pollDeviceStatus(@Body request: PollDeviceStatusRequest): Response<LoginResponse>
 

@@ -42,7 +42,9 @@ data class DeviceCodeResponse(
 
 data class PollDeviceStatusRequest(
     @SerializedName("device_code")
-    val deviceCode: String
+    val deviceCode: String,
+    @SerializedName("device_name")
+    val deviceName: String
 )
 
 data class RefreshRequest(

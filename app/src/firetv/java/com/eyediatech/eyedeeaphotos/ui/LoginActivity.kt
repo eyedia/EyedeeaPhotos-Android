@@ -94,7 +94,7 @@ class LoginActivity : FragmentActivity() {
                 delay(interval * 1000L)
                 try {
                     val response = RetrofitClient.instance.pollDeviceStatus(
-                        PollDeviceStatusRequest(deviceCode)
+                        PollDeviceStatusRequest(deviceCode, android.os.Build.MODEL)
                     )
                     if (response.isSuccessful && response.body() != null) {
                         val authData = response.body()!!
@@ -111,8 +111,12 @@ class LoginActivity : FragmentActivity() {
                         Log.d("AUTH_DEBUG", "Device code expired or consumed. Requesting a new one.")
                         fetchDeviceCode()
                         break 
+                    } else if (response.code() == 400) {
+                        val errorStr = response.errorBody()?.string() ?: ""
+                        Log.d("AUTH_DEBUG", "Polling returned 400: $errorStr")
                     }
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     Log.w("AUTH_DEBUG", "Polling failed with exception: ${e.message}")
                 }
             }
