@@ -47,6 +47,16 @@ data class PollDeviceStatusRequest(
     val deviceName: String
 )
 
+data class PollDeviceResponse(
+    val status: String?, // "pending", "approved", "expired"
+    val message: String?,
+    val token: String?,
+    @SerializedName("refresh_token")
+    val refreshToken: String?,
+    val user: User?,
+    val group: String?
+)
+
 data class RefreshRequest(
     @SerializedName("refresh_token")
     val refreshToken: String

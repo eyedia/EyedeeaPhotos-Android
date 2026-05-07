@@ -37,6 +37,11 @@ class LoginActivity : FragmentActivity() {
 
         authRepository = AuthRepository(this)
         
+        binding.refreshButton.setOnClickListener {
+            deviceCodeRefreshAttempts = 0
+            fetchDeviceCode()
+        }
+        
         setupFireTVLogin()
     }
 
@@ -57,7 +62,7 @@ class LoginActivity : FragmentActivity() {
         
         binding.loadingProgressBar.visibility = View.VISIBLE
         binding.qrContainer.visibility = View.GONE
-        binding.failureTextView.visibility = View.GONE
+        binding.noInputContainer.visibility = View.GONE
 
         lifecycleScope.launch {
             try {
@@ -97,23 +102,56 @@ class LoginActivity : FragmentActivity() {
                         PollDeviceStatusRequest(deviceCode, android.os.Build.MODEL)
                     )
                     if (response.isSuccessful && response.body() != null) {
-                        val authData = response.body()!!
-                        if (authData.user != null) {
-                            val userJson = Gson().toJson(authData.user)
-                            authRepository.saveAuthData(
-                                authData.token, authData.refreshToken, authData.user.currentHouseholdId,
-                                authData.user.defaultSourceId, authData.user.name, userJson, authData.group
-                            )
-                            navigateToMain()
-                            break
+                        val pollData = response.body()!!
+                        
+                        // Handle the new 200 OK polling logic
+                        when (pollData.status) {
+                            "approved" -> {
+                                if (pollData.user != null && pollData.token != null) {
+                                    val userJson = Gson().toJson(pollData.user)
+                                    authRepository.saveAuthData(
+                                        pollData.token, pollData.refreshToken, pollData.user.currentHouseholdId,
+                                        pollData.user.defaultSourceId, pollData.user.name, userJson, pollData.group ?: ""
+                                    )
+                                    navigateToMain()
+                                    break
+                                }
+                            }
+                            "expired" -> {
+                                Log.d("AUTH_DEBUG", "Device code expired (200 OK). Requesting a new one.")
+                                fetchDeviceCode()
+                                break
+                            }
+                            "pending" -> {
+                                // Continue polling
+                            }
+                            else -> {
+                                // Fallback for old API behavior if `status` field is missing 
+                                // but we got a 200 OK with user info.
+                                if (pollData.user != null && pollData.token != null) {
+                                    val userJson = Gson().toJson(pollData.user)
+                                    authRepository.saveAuthData(
+                                        pollData.token, pollData.refreshToken, pollData.user.currentHouseholdId,
+                                        pollData.user.defaultSourceId, pollData.user.name, userJson, pollData.group ?: ""
+                                    )
+                                    navigateToMain()
+                                    break
+                                }
+                            }
                         }
                     } else if (response.code() == 410) { 
-                        Log.d("AUTH_DEBUG", "Device code expired or consumed. Requesting a new one.")
+                        Log.d("AUTH_DEBUG", "Device code expired or consumed (410). Requesting a new one.")
                         fetchDeviceCode()
                         break 
                     } else if (response.code() == 400) {
                         val errorStr = response.errorBody()?.string() ?: ""
                         Log.d("AUTH_DEBUG", "Polling returned 400: $errorStr")
+                        // If it's the expected 'authorization_pending', keep polling.
+                        if (errorStr.contains("expired")) {
+                            Log.d("AUTH_DEBUG", "Device code expired (400). Requesting a new one.")
+                            fetchDeviceCode()
+                            break
+                        }
                     }
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -146,7 +184,8 @@ class LoginActivity : FragmentActivity() {
     private fun showFailureState() {
         binding.loadingProgressBar.visibility = View.GONE
         binding.qrContainer.visibility = View.GONE
-        binding.failureTextView.visibility = View.VISIBLE
+        binding.noInputContainer.visibility = View.VISIBLE
+        binding.refreshButton.requestFocus()
     }
 
 

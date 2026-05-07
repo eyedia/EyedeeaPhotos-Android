@@ -17,7 +17,7 @@ interface ApiService {
 
     @Headers("Accept: application/json", "Connection: close")
     @POST("/api/v1/auth/device")
-    suspend fun pollDeviceStatus(@Body request: PollDeviceStatusRequest): Response<LoginResponse>
+    suspend fun pollDeviceStatus(@Body request: PollDeviceStatusRequest): Response<PollDeviceResponse>
 
     @GET("/api/v1/{householdId}/sources")
     suspend fun getSources(
