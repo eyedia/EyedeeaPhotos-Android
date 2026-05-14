@@ -10,13 +10,14 @@ object UserAgentUtils {
         val androidVersion = Build.VERSION.RELEASE
         val model = Build.MODEL
         
+        val buildId = Build.ID
+        
         if (BuildConfig.FLAVOR == "firetv") {
-            val buildId = Build.ID
             return "EyedeeaPhotos/$versionName (FireTV; Android $androidVersion; $model Build/$buildId)"
         } else {
             val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
             val deviceType = if (isTablet) "tablet" else "mobile"
-            return "EyedeeaPhotos/$versionName (Android; $deviceType; Android $androidVersion; $model)"
+            return "EyedeeaPhotos/$versionName (Android; $deviceType; Android $androidVersion; $model Build/$buildId)"
         }
     }
 }

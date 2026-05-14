@@ -62,7 +62,7 @@ class MainActivity : FragmentActivity() {
         binding.webView.webViewClient = object : android.webkit.WebViewClient() {
             private fun checkUrlAndInjectToken(view: WebView?, url: String?) {
                 if (authRepository.isAuthenticated()) {
-                    val isAtLogin = url?.contains("/auth/login") == true
+                    val isAtLogin = url?.contains("/app-login") == true
                     val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
                     val urlWithoutQuery = url?.substringBefore("?")?.removeSuffix("/")
                     val isAtRoot = urlWithoutQuery == baseUrl

@@ -44,8 +44,8 @@
   - NO native platform billing (Google Play Billing or Amazon IAP) is implemented.
   - NO links, buttons, or prompts suggesting users upgrade, subscribe, or purchase inside the app.
 - **Authentication Flow:**
-  - Login via browser/Custom Tabs or QR code to `eyedeeaphotos.com/activate`.
-  - The `/activate` web page MUST be a dead-end with no links to checkout, pricing, or the main homepage (the logo must not be clickable).
+  - Login via browser/Custom Tabs pointing to an isolated "island" login page (e.g., `eyedeeaphotos.com/app-login` or `?source=app`).
+  - This app-specific login web page MUST be a dead-end with no links to checkout, pricing, or the main homepage (the logo must not be clickable).
 - **Error Handling (Storage/Subscription):** 
   - If a user's web subscription is inactive or storage limits are reached, the app fails gracefully (e.g., "Subscription Required" or "Upload Failed") without upselling or linking to checkout.
 - **Android Specifics:** 

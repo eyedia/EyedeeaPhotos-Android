@@ -248,7 +248,7 @@ class MainActivity : AppCompatActivity() {
                 updateSettingsIconVisibility(url)
 
                 if (authRepository.isAuthenticated()) {
-                    val isAtLogin = url?.contains("/auth/login") == true
+                    val isAtLogin = url?.contains("/app-login") == true
                     val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
                     val isAtRoot = url == BuildConfig.BASE_URL || url == "$baseUrl/" || url == baseUrl
                     
@@ -302,7 +302,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("BACK_BTN", "Target previous URL: $previousUrl")
                     
                     val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val isPreviousLogin = previousUrl.contains("/auth/login") == true
+                    val isPreviousLogin = previousUrl.contains("/app-login") == true
                     val isPreviousRoot = previousUrl == BuildConfig.BASE_URL || previousUrl == "$baseUrl/" || previousUrl == baseUrl
                     
                     if (authRepository.isAuthenticated() && (isPreviousLogin || isPreviousRoot)) {
