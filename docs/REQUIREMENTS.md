@@ -37,3 +37,17 @@
   - Consistent use of branding blue: `#0EA5E9`.
   - Fully compatible with light and dark system themes (Material Components).
   - Verified visibility on Samsung Galaxy S22 and other flagship devices.
+
+## App Store Compliance (Google Play & Android)
+- **Model:** Operates strictly as a "Companion / Reader App" to the Eyedeea web platform.
+- **Monetization / Billing:** 
+  - NO native platform billing (Google Play Billing or Amazon IAP) is implemented.
+  - NO links, buttons, or prompts suggesting users upgrade, subscribe, or purchase inside the app.
+- **Authentication Flow:**
+  - Login via browser/Custom Tabs or QR code to `eyedeeaphotos.com/activate`.
+  - The `/activate` web page MUST be a dead-end with no links to checkout, pricing, or the main homepage (the logo must not be clickable).
+- **Error Handling (Storage/Subscription):** 
+  - If a user's web subscription is inactive or storage limits are reached, the app fails gracefully (e.g., "Subscription Required" or "Upload Failed") without upselling or linking to checkout.
+- **Android Specifics:** 
+  - Photo uploads must use modern Android photo selection (Photo Picker or `ACTION_SEND` intents) rather than requesting broad, general storage permissions.
+  - Provide an Account Deletion link via Google Play Console (Data Safety section) as per Google policy.
