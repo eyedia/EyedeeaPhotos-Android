@@ -37,6 +37,11 @@ class LoginActivity : FragmentActivity() {
 
         authRepository = AuthRepository(this)
         
+        if (authRepository.isAuthenticated()) {
+            navigateToMain()
+            return
+        }
+        
         binding.refreshButton.setOnClickListener {
             deviceCodeRefreshAttempts = 0
             fetchDeviceCode()
@@ -70,13 +75,12 @@ class LoginActivity : FragmentActivity() {
                 if (response.isSuccessful && response.body() != null) {
                     val deviceData = response.body()!!
                     
-                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val qrUrl = "$baseUrl${deviceData.verificationUri}"
-                    Log.d("AUTH_DEBUG", "Generating QR Code for URL: $qrUrl")
+                    // Removed QR Code generation to comply with Amazon Appstore policies
+                    // val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+                    // val qrUrl = "$baseUrl${deviceData.verificationUri}"
+                    // val qrBitmap = QRGenerator.generateQRCode(qrUrl, 600)
+                    // binding.qrImageView.setImageBitmap(qrBitmap)
                     
-                    val qrBitmap = QRGenerator.generateQRCode(qrUrl, 600)
-                    
-                    binding.qrImageView.setImageBitmap(qrBitmap)
                     binding.userCodeTextView.text = deviceData.userCode
                     
                     binding.loadingProgressBar.visibility = View.GONE
@@ -101,8 +105,10 @@ class LoginActivity : FragmentActivity() {
                     val response = RetrofitClient.instance.pollDeviceStatus(
                         PollDeviceStatusRequest(deviceCode, android.os.Build.MODEL)
                     )
+                    Log.d("AUTH_DEBUG", "Poll response code: ${response.code()}")
                     if (response.isSuccessful && response.body() != null) {
                         val pollData = response.body()!!
+                        Log.d("AUTH_DEBUG", "Poll data status: ${pollData.status}, hasUser: ${pollData.user != null}, hasToken: ${pollData.token != null}")
                         
                         // Handle the new 200 OK polling logic
                         when (pollData.status) {
@@ -113,8 +119,11 @@ class LoginActivity : FragmentActivity() {
                                         pollData.token, pollData.refreshToken, pollData.user.currentHouseholdId,
                                         pollData.user.defaultSourceId, pollData.user.name, userJson, pollData.group ?: ""
                                     )
+                                    Log.d("AUTH_DEBUG", "Auth data saved, navigating to main.")
                                     navigateToMain()
                                     break
+                                } else {
+                                    Log.w("AUTH_DEBUG", "Status is approved but missing user or token!")
                                 }
                             }
                             "expired" -> {
@@ -124,16 +133,19 @@ class LoginActivity : FragmentActivity() {
                             }
                             "pending" -> {
                                 // Continue polling
+                                Log.d("AUTH_DEBUG", "Status is pending, continuing to poll.")
                             }
                             else -> {
                                 // Fallback for old API behavior if `status` field is missing 
                                 // but we got a 200 OK with user info.
+                                Log.d("AUTH_DEBUG", "Unknown or null status: ${pollData.status}. Checking user/token fallback.")
                                 if (pollData.user != null && pollData.token != null) {
                                     val userJson = Gson().toJson(pollData.user)
                                     authRepository.saveAuthData(
                                         pollData.token, pollData.refreshToken, pollData.user.currentHouseholdId,
                                         pollData.user.defaultSourceId, pollData.user.name, userJson, pollData.group ?: ""
                                     )
+                                    Log.d("AUTH_DEBUG", "Fallback auth data saved, navigating to main.")
                                     navigateToMain()
                                     break
                                 }
@@ -152,6 +164,8 @@ class LoginActivity : FragmentActivity() {
                             fetchDeviceCode()
                             break
                         }
+                    } else {
+                        Log.w("AUTH_DEBUG", "Unhandled poll response code: ${response.code()} error: ${response.errorBody()?.string()}")
                     }
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e

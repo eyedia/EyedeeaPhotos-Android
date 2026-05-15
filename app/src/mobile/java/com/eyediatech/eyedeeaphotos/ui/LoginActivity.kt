@@ -23,6 +23,11 @@ class LoginActivity : AppCompatActivity() {
 
         authRepository = AuthRepository(this)
 
+        if (authRepository.isAuthenticated()) {
+            navigateToMain()
+            return
+        }
+
         setupMobileLogin()
         intent?.let { handleDeepLink(it) }
     }

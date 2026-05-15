@@ -115,7 +115,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.logoutButton.setOnClickListener { logout() }
         
         binding.logoLinkButton.setOnClickListener {
-            val browserIntent = Intent(Intent.ACTION_VIEW, "https://www.eyedeeaphotos.com/".toUri())
+            val browserIntent = Intent(Intent.ACTION_VIEW, "https://eyedeeaphotos.com/".toUri())
             startActivity(browserIntent)
         }
 

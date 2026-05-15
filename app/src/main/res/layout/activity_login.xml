@@ -63,13 +63,13 @@
             android:text="@string/login_button_text" />
     </LinearLayout>
 
-    <!-- Fire TV Login Section (Side-by-side) -->
+    <!-- Fire TV Login Section (Centered) -->
     <LinearLayout
         android:id="@+id/qrContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -77,66 +77,49 @@
         app:layout_constraintTop_toBottomOf="@+id/subtitleTextView"
         tools:visibility="visible">
 
-        <!-- Left Side: QR Code -->
-        <ImageView
-            android:id="@+id/qrImageView"
-            android:layout_width="250dp"
-            android:layout_height="250dp"
-            android:layout_marginEnd="32dp"
-            android:scaleType="fitCenter"
-            tools:src="@android:drawable/ic_menu_gallery" />
-
-        <!-- Right Side: Instructions and Code -->
-        <LinearLayout
-            android:layout_width="250dp"
-            android:layout_height="250dp"
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:gravity="center"
-            android:orientation="vertical">
+            android:text="@string/scan_to_login"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/scan_to_login"
-                android:textColor="@color/text_primary"
-                android:textSize="28sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/instructionTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/login_instruction"
+            android:textColor="@color/text_secondary"
+            android:textSize="20sp" />
 
-            <TextView
-                android:id="@+id/instructionTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:text="@string/login_instruction"
-                android:textColor="@color/text_secondary"
-                android:textSize="16sp" />
+        <TextView
+            android:id="@+id/userCodeTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:letterSpacing="0.2"
+            android:paddingVertical="4dp"
+            android:textColor="@color/text_primary"
+            android:textSize="64sp"
+            android:textStyle="bold"
+            tools:text="ABCD-1234" />
 
-            <TextView
-                android:id="@+id/userCodeTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:letterSpacing="0.2"
-                android:paddingVertical="4dp"
-                android:textColor="@color/text_primary"
-                android:textSize="44sp"
-                android:textStyle="bold"
-                tools:text="ABCD-1234" />
+        <ProgressBar
+            android:id="@+id/pollingProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="300dp"
+            android:layout_height="8dp"
+            android:layout_marginTop="24dp"
+            android:indeterminate="false"
+            android:max="300"
+            android:progress="300"
+            android:progressDrawable="@drawable/custom_progress_bar" />
 
-            <ProgressBar
-                android:id="@+id/pollingProgressBar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="8dp"
-                android:layout_marginTop="8dp"
-                android:indeterminate="false"
-                android:max="300"
-                android:progress="300"
-                android:progressDrawable="@drawable/custom_progress_bar" />
-
-        </LinearLayout>
     </LinearLayout>
 
     <!-- Generic Loading Spinner -->
