@@ -109,10 +109,12 @@ class LoginActivity : FragmentActivity() {
                 delay(interval * 1000L)
                 try {
                     Log.d("AUTH_DEBUG", "ON LOG: POST call to poll device status with device_code=$deviceCode")
-                    val response = RetrofitClient.instance.pollDeviceStatus(deviceCode)
+                    val request = com.eyediatech.eyedeeaphotos.data.PollDeviceStatusRequest(deviceCode, android.os.Build.MODEL)
+                    val response = RetrofitClient.instance.pollDeviceStatus(request)
                     Log.d("AUTH_DEBUG", "Poll response code: ${response.code()}")
                     if (response.isSuccessful && response.body() != null) {
                         val pollData = response.body()!!
+                        Log.d("AUTH_DEBUG", "Poll response body: ${Gson().toJson(pollData)}")
                         Log.d("AUTH_DEBUG", "Poll data status: ${pollData.status}, hasUser: ${pollData.user != null}, hasToken: ${pollData.token != null}")
                         
                         // Handle the new 200 OK polling logic

@@ -81,10 +81,10 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField("String", "BASE_URL", "\"https://eyedeeaphotos.com/\"")
-            buildConfigField("String", "VIEW_URL", "\"https://eyedeeaphotos.com/view\"")
-            buildConfigField("String", "LOGIN_URL", "\"https://eyedeeaphotos.com/app-login?device=android\"")
-            buildConfigField("String", "VERIFICATION_URL", "\"https://eyedeeaphotos.com/auth/device\"")
+            buildConfigField("String", "BASE_URL", "\"https://www.eyedeeaphotos.com/\"")
+            buildConfigField("String", "VIEW_URL", "\"https://www.eyedeeaphotos.com/view\"")
+            buildConfigField("String", "LOGIN_URL", "\"https://www.eyedeeaphotos.com/app-login?device=android\"")
+            buildConfigField("String", "VERIFICATION_URL", "\"https://www.eyedeeaphotos.com/auth/device\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "false")
         }
         getByName("debug") {

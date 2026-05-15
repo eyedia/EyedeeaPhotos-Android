@@ -15,9 +15,9 @@ interface ApiService {
     @GET("/api/v1/auth/device")
     suspend fun getDeviceCode(): Response<DeviceCodeResponse>
 
-    @Headers("Accept: application/json", "Connection: close")
+    @Headers("Accept: application/json")
     @POST("/api/v1/auth/device")
-    suspend fun pollDeviceStatus(@Query("device_code") deviceCode: String): Response<PollDeviceResponse>
+    suspend fun pollDeviceStatus(@Body request: PollDeviceStatusRequest): Response<PollDeviceResponse>
 
     @GET("/api/v1/{householdId}/sources")
     suspend fun getSources(
