@@ -71,6 +71,7 @@ class LoginActivity : FragmentActivity() {
 
         lifecycleScope.launch {
             try {
+                Log.d("AUTH_DEBUG", "ON LOG: GET call to /api/v1/auth/device to fetch device code")
                 val response = RetrofitClient.instance.getDeviceCode()
                 if (response.isSuccessful && response.body() != null) {
                     val deviceData = response.body()!!
@@ -89,7 +90,12 @@ class LoginActivity : FragmentActivity() {
                     startPolling(deviceData.deviceCode, deviceData.interval)
                     startCountdown(deviceData.expiresIn)
                 } else {
-                    handleFetchError()
+                    if (response.code() == 429) {
+                        Log.d("AUTH_DEBUG", "Fetch device code rate limited (429). Showing refresh screen.")
+                        showFailureState(429)
+                    } else {
+                        handleFetchError()
+                    }
                 }
             } catch (e: Exception) {
                 handleFetchError()
@@ -102,9 +108,8 @@ class LoginActivity : FragmentActivity() {
             while (true) {
                 delay(interval * 1000L)
                 try {
-                    val response = RetrofitClient.instance.pollDeviceStatus(
-                        PollDeviceStatusRequest(deviceCode, android.os.Build.MODEL)
-                    )
+                    Log.d("AUTH_DEBUG", "ON LOG: POST call to poll device status with device_code=$deviceCode")
+                    val response = RetrofitClient.instance.pollDeviceStatus(deviceCode)
                     Log.d("AUTH_DEBUG", "Poll response code: ${response.code()}")
                     if (response.isSuccessful && response.body() != null) {
                         val pollData = response.body()!!
@@ -164,6 +169,10 @@ class LoginActivity : FragmentActivity() {
                             fetchDeviceCode()
                             break
                         }
+                    } else if (response.code() == 429) {
+                        Log.d("AUTH_DEBUG", "Rate limited (429). Showing refresh screen.")
+                        showFailureState(429)
+                        break
                     } else {
                         Log.w("AUTH_DEBUG", "Unhandled poll response code: ${response.code()} error: ${response.errorBody()?.string()}")
                     }
@@ -195,11 +204,18 @@ class LoginActivity : FragmentActivity() {
         }
     }
 
-    private fun showFailureState() {
+    private fun showFailureState(errorCode: Int? = null) {
         binding.loadingProgressBar.visibility = View.GONE
         binding.qrContainer.visibility = View.GONE
         binding.noInputContainer.visibility = View.VISIBLE
         binding.refreshButton.requestFocus()
+
+        if (errorCode != null) {
+            binding.errorCodeTextView.visibility = View.VISIBLE
+            binding.errorCodeTextView.text = getString(com.eyediatech.eyedeeaphotos.R.string.error_code_display, errorCode)
+        } else {
+            binding.errorCodeTextView.visibility = View.GONE
+        }
     }
 
 

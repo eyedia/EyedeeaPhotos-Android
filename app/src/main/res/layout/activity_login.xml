@@ -167,6 +167,17 @@
             android:textAllCaps="false"
             android:focusable="true"
             android:focusableInTouchMode="true" />
+
+        <TextView
+            android:id="@+id/errorCodeTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#999999"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="error_code: 429"
+            tools:visibility="visible" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

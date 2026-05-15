@@ -32,6 +32,7 @@
     <string name="refresh_button">Refresh</string>
     <string name="scan_to_login">Device Activation</string>
     <string name="login_button_text">Login</string>
+    <string name="error_code_display">error_code: %1$d</string>
 
     <!-- Share Activity -->
     <string name="queuing_photos">Queuing photos…</string>
