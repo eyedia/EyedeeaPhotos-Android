@@ -272,6 +272,8 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 Log.d("AUTH_DEBUG", "onPageFinished: $url")
                 
+                findViewById<View>(R.id.progressBar)?.visibility = View.GONE
+                
                 if (url != "file:///android_asset/error.html") {
                     sharedPreferences.edit { putBoolean(SERVER_DOWN, false) }
                 }

@@ -94,6 +94,7 @@ class MainActivity : FragmentActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                binding.progressBar.visibility = android.view.View.GONE
                 checkUrlAndInjectToken(view, url)
             }
 
