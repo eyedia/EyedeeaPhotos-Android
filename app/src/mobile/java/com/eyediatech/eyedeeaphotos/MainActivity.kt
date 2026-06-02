@@ -227,14 +227,45 @@ class MainActivity : AppCompatActivity() {
 
         // Custom WebViewClient to handle downloads and navigation
         webView.webViewClient = object : WebViewClient() {
+            private fun checkUrlAndInjectToken(view: WebView?, url: String?) {
+                if (url == null) return
+                if (authRepository.isAuthenticated()) {
+                    val uri = try { Uri.parse(url) } catch (e: Exception) { null }
+                    if (uri != null) {
+                        val baseUrlUri = Uri.parse(BuildConfig.BASE_URL)
+                        
+                        // Check if the URL belongs to our backend host
+                        if (uri.host == baseUrlUri.host) {
+                            val path = uri.path ?: ""
+                            // Anything that is the root page, login page, or home page
+                            val isUnauthenticatedPage = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
+                            
+                            if (isUnauthenticatedPage) {
+                                Log.d("AUTH_DEBUG", "Detected unauthenticated page while authenticated locally. URL: $url")
+                                view?.visibility = View.INVISIBLE
+                                injectTokenIntoLocalStorage()
+                            } else {
+                                view?.visibility = View.VISIBLE
+                            }
+                        } else {
+                            view?.visibility = View.VISIBLE
+                        }
+                    } else {
+                        view?.visibility = View.VISIBLE
+                    }
+                }
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 updateSettingsIconVisibility(url)
+                checkUrlAndInjectToken(view, url)
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 updateSettingsIconVisibility(url)
+                checkUrlAndInjectToken(view, url)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -246,17 +277,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 updateSettingsIconVisibility(url)
-
-                if (authRepository.isAuthenticated()) {
-                    val isAtLogin = url?.contains("/app-login") == true
-                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val isAtRoot = url == BuildConfig.BASE_URL || url == "$baseUrl/" || url == baseUrl
-                    
-                    if (isAtLogin || isAtRoot) {
-                        Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token.")
-                        injectTokenIntoLocalStorage()
-                    }
-                }
+                checkUrlAndInjectToken(view, url)
             }
 
             @RequiresApi(Build.VERSION_CODES.M)
@@ -301,11 +322,17 @@ class MainActivity : AppCompatActivity() {
                     val previousUrl = history.getItemAtIndex(currentIndex - 1).url
                     Log.d("BACK_BTN", "Target previous URL: $previousUrl")
                     
-                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val isPreviousLogin = previousUrl.contains("/app-login") == true
-                    val isPreviousRoot = previousUrl == BuildConfig.BASE_URL || previousUrl == "$baseUrl/" || previousUrl == baseUrl
+                    var isPreviousUnauthenticated = false
+                    try {
+                        val prevUri = Uri.parse(previousUrl)
+                        val baseUri = Uri.parse(BuildConfig.BASE_URL)
+                        if (prevUri.host == baseUri.host) {
+                            val path = prevUri.path ?: ""
+                            isPreviousUnauthenticated = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
+                        }
+                    } catch (e: Exception) {}
                     
-                    if (authRepository.isAuthenticated() && (isPreviousLogin || isPreviousRoot)) {
+                    if (authRepository.isAuthenticated() && isPreviousUnauthenticated) {
                         Log.d("BACK_BTN", "Prevented redirect loop to login/root. Exiting app instead.")
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()

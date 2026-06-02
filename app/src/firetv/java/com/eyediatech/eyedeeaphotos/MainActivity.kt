@@ -61,17 +61,35 @@ class MainActivity : FragmentActivity() {
 
         binding.webView.webViewClient = object : android.webkit.WebViewClient() {
             private fun checkUrlAndInjectToken(view: WebView?, url: String?) {
+                if (url == null) return
                 if (authRepository.isAuthenticated()) {
-                    val isAtLogin = url?.contains("/app-login") == true
-                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val urlWithoutQuery = url?.substringBefore("?")?.removeSuffix("/")
-                    val isAtRoot = urlWithoutQuery == baseUrl
-                    
-                    if (isAtLogin || isAtRoot) {
-                        Log.d("AUTH_DEBUG", "Detected login/root page while authenticated. Injecting token. URL: $url")
-                        injectTokenIntoLocalStorage(view)
+                    val uri = try { android.net.Uri.parse(url) } catch (e: Exception) { null }
+                    if (uri != null) {
+                        val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
+                        
+                        if (uri.host == baseUrlUri.host) {
+                            val path = uri.path ?: ""
+                            val isUnauthenticatedPage = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
+                            
+                            if (isUnauthenticatedPage) {
+                                Log.d("AUTH_DEBUG", "Detected unauthenticated page while authenticated locally. URL: $url")
+                                view?.visibility = android.view.View.INVISIBLE
+                                injectTokenIntoLocalStorage(view)
+                            } else {
+                                view?.visibility = android.view.View.VISIBLE
+                            }
+                        } else {
+                            view?.visibility = android.view.View.VISIBLE
+                        }
+                    } else {
+                        view?.visibility = android.view.View.VISIBLE
                     }
                 }
+            }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                checkUrlAndInjectToken(view, url)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
