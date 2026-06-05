@@ -65,6 +65,8 @@ class LoginActivity : AppCompatActivity() {
             val encodedCallback = Uri.encode("eyedeea://auth?t=$timestamp")
             val loginUrl = "${BuildConfig.LOGIN_URL}&callback=$encodedCallback"
             
+            android.util.Log.d("LOGIN_DEBUG", "Navigating to Login URL: $loginUrl")
+            
             try {
                 val customTabsIntent = androidx.browser.customtabs.CustomTabsIntent.Builder().build()
                 customTabsIntent.launchUrl(this, Uri.parse(loginUrl))

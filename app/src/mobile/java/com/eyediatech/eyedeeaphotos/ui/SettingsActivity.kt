@@ -181,13 +181,15 @@ class SettingsActivity : AppCompatActivity() {
             
             // Priority 1: Check if any sync just finished
             if (succeededWork != null && !isSyncing) {
-                 // Check if it's a recent success (WorkManager might keep old successes in the list)
-                 // For simplicity, if we see a success and we were waiting for it, we close.
-                 // We can use the tag 'ManualSync' specifically if we added it.
                  val isManualSuccess = succeededWork.tags.contains("ManualSync")
                  if (isManualSuccess) {
-                     Toast.makeText(this@SettingsActivity, "Manual sync completed successfully", Toast.LENGTH_SHORT).show()
-                     // Let's not finish(), so the user can see the queue.
+                     val snackbar = com.google.android.material.snackbar.Snackbar.make(binding.root, "Manual sync completed", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                     val view = snackbar.view
+                     val params = view.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+                     params.gravity = android.view.Gravity.TOP
+                     view.layoutParams = params
+                     snackbar.show()
+                     WorkManager.getInstance(this@SettingsActivity).pruneWork()
                  }
             }
 
@@ -209,14 +211,13 @@ class SettingsActivity : AppCompatActivity() {
                     }
                     else -> {
                         binding.syncProgressBar.visibility = View.GONE
-                        binding.syncNowButton.setText(R.string.sync_now)
-                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#0EA5E9".toColorInt())
                         updateNextSyncTime(adapter.itemCount > 0)
+                        binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#0EA5E9".toColorInt())
                         updateSyncStatusUI(adapter.currentList)
                     }
                 }
             } else {
-                binding.syncNowButton.setText(R.string.sync_now)
+                updateNextSyncTime(adapter.itemCount > 0)
                 binding.syncNowButton.backgroundTintList = ColorStateList.valueOf("#0EA5E9".toColorInt())
             }
         }
@@ -246,6 +247,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun updateNextSyncTime(hasPhotos: Boolean) {
         if (!hasPhotos) {
             binding.nextSyncTextView.visibility = View.GONE
+            binding.syncNowButton.text = getString(R.string.sync_now)
             return
         }
         binding.nextSyncTextView.visibility = View.VISIBLE
@@ -263,7 +265,10 @@ class SettingsActivity : AppCompatActivity() {
             nextSync.add(Calendar.HOUR_OF_DAY, 1)
         }
         
-        binding.nextSyncTextView.text = getString(R.string.next_scheduled_sync, sdf.format(nextSync.time))
+        binding.nextSyncTextView.text = getString(R.string.next_scheduled_sync)
+        if (!isSyncing) {
+            binding.syncNowButton.text = "Sync Now (Next: ${sdf.format(nextSync.time)})"
+        }
     }
 
     private fun setupWorkManager() {

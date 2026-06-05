@@ -46,8 +46,109 @@ class MainActivity : AppCompatActivity() {
     private var tokenInjectionCount = 0
     private var settingsIcon: ImageView? = null
     private var settingsButtonContainer: View? = null
+    private var expandedMenuContainer: View? = null
+    private var uploadIcon: View? = null
+    private var settingsActionIcon: View? = null
+    private var isMenuExpanded = false
     private var queueBadge: TextView? = null
+    private var settingsActionBadge: TextView? = null
     private val storagePermissionRequestCode = 1001
+
+    private val pickImagesLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            queuePhotos(uris)
+        }
+    }
+
+    private val requestLocationPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        pickImagesLauncher.launch("image/*")
+    }
+
+    private fun checkLocationPermissionAndPickImages() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_MEDIA_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLocationPermissionLauncher.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        } else {
+            pickImagesLauncher.launch("image/*")
+        }
+    }
+
+    private fun queuePhotos(uris: List<Uri>) {
+        lifecycleScope.launch {
+            Toast.makeText(this@MainActivity, "Your photos are queued and will sync soon.", Toast.LENGTH_LONG).show()
+            withContext(Dispatchers.IO) {
+                for (uri in uris) {
+                    val internalFile = copyToInternalStorage(uri)
+                    if (internalFile != null) {
+                        val queuedPhoto = com.eyediatech.eyedeeaphotos.data.QueuedPhoto(
+                            fileUri = uri.toString(),
+                            internalPath = internalFile.absolutePath,
+                            fileName = internalFile.name
+                        )
+                        photoRepository.insert(queuedPhoto)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun copyToInternalStorage(uri: Uri): java.io.File? = withContext(Dispatchers.IO) {
+        try {
+            var fileName = ""
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst()) {
+                    fileName = cursor.getString(nameIndex)
+                }
+            }
+            
+            if (fileName.isEmpty()) {
+                fileName = "photo_${System.currentTimeMillis()}_${(0..1000).random()}.jpg"
+            }
+            
+            val fileDir = java.io.File(filesDir, "queue")
+            if (!fileDir.exists()) fileDir.mkdirs()
+            
+            var finalFile = java.io.File(fileDir, fileName)
+            if (finalFile.exists()) {
+                val nameWithoutExt = fileName.substringBeforeLast(".")
+                val ext = fileName.substringAfterLast(".", "jpg")
+                finalFile = java.io.File(fileDir, "${nameWithoutExt}_${System.currentTimeMillis()}.$ext")
+            }
+
+            var finalUri = uri
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.ACCESS_MEDIA_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    try {
+                        if (uri.authority == android.provider.MediaStore.AUTHORITY) {
+                            finalUri = android.provider.MediaStore.setRequireOriginal(uri)
+                        }
+                    } catch (e: Exception) {
+                        finalUri = uri
+                    }
+                }
+            }
+
+            contentResolver.openInputStream(finalUri)?.use { input ->
+                finalFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            finalFile
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     // For handling downloads after permission grant
     private var pendingDownloadUrl: String? = null
@@ -165,6 +266,9 @@ class MainActivity : AppCompatActivity() {
         val visibility = if (isAtView) View.GONE else View.VISIBLE
         settingsIcon?.visibility = visibility
         settingsButtonContainer?.visibility = visibility
+        if (visibility == View.GONE && isMenuExpanded) {
+            toggleMenu()
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -200,12 +304,27 @@ class MainActivity : AppCompatActivity() {
         // --- Settings Icon for Mobile Flavor ---
         settingsButtonContainer = findViewById(R.id.settingsButtonContainer)
         settingsIcon = findViewById(R.id.settingsIcon)
+        expandedMenuContainer = findViewById(R.id.expandedMenuContainer)
+        uploadIcon = findViewById(R.id.uploadIcon)
+        settingsActionIcon = findViewById(R.id.settingsActionIcon)
         queueBadge = findViewById(R.id.queueBadge)
+        settingsActionBadge = findViewById(R.id.settingsActionBadge)
 
         settingsButtonContainer?.bringToFront()
+        expandedMenuContainer?.bringToFront()
 
         if (settingsButtonContainer != null) {
             settingsButtonContainer?.setOnClickListener {
+                toggleMenu()
+            }
+            
+            uploadIcon?.setOnClickListener {
+                toggleMenu()
+                checkLocationPermissionAndPickImages()
+            }
+            
+            settingsActionIcon?.setOnClickListener {
+                toggleMenu()
                 startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
             }
 
@@ -214,12 +333,24 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 photoRepository.allQueuedPhotos.collectLatest { photos ->
                     if (photos.isNotEmpty()) {
-                        queueBadge?.visibility = View.VISIBLE
-                        queueBadge?.text = if (photos.size > 99) "99+" else photos.size.toString()
-                        settingsIcon?.alpha = 1.0f
+                        val countText = if (photos.size > 99) "99+" else photos.size.toString()
+                        if (isMenuExpanded) {
+                            queueBadge?.visibility = View.GONE
+                            settingsActionBadge?.visibility = View.VISIBLE
+                            settingsActionBadge?.text = countText
+                            settingsIcon?.alpha = 1.0f
+                        } else {
+                            queueBadge?.visibility = View.VISIBLE
+                            queueBadge?.text = countText
+                            settingsActionBadge?.visibility = View.GONE
+                            settingsIcon?.alpha = 1.0f
+                        }
                     } else {
                         queueBadge?.visibility = View.GONE
-                        settingsIcon?.alpha = 0.4f
+                        settingsActionBadge?.visibility = View.GONE
+                        if (!isMenuExpanded) {
+                            settingsIcon?.alpha = 0.4f
+                        }
                     }
                 }
             }
@@ -349,6 +480,35 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun toggleMenu() {
+        isMenuExpanded = !isMenuExpanded
+        if (isMenuExpanded) {
+            expandedMenuContainer?.visibility = View.VISIBLE
+            settingsIcon?.setImageResource(R.drawable.ic_close)
+            settingsIcon?.alpha = 1.0f
+            
+            // Move badge from hamburger to settings gear
+            if (queueBadge?.visibility == View.VISIBLE) {
+                queueBadge?.visibility = View.GONE
+                settingsActionBadge?.visibility = View.VISIBLE
+                settingsActionBadge?.text = queueBadge?.text
+            }
+        } else {
+            expandedMenuContainer?.visibility = View.GONE
+            settingsIcon?.setImageResource(R.drawable.ic_menu)
+            
+            // Move badge back to hamburger
+            if (settingsActionBadge?.visibility == View.VISIBLE) {
+                settingsActionBadge?.visibility = View.GONE
+                queueBadge?.visibility = View.VISIBLE
+                queueBadge?.text = settingsActionBadge?.text
+                settingsIcon?.alpha = 1.0f
+            } else {
+                settingsIcon?.alpha = 0.4f
+            }
+        }
     }
 
     private fun handleDownload(url: String, userAgent: String, contentDisposition: String, mimetype: String) {

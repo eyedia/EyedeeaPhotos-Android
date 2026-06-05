@@ -90,10 +90,10 @@ android {
         getByName("debug") {
             isDebuggable = true
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100:5174/\"")
-            buildConfigField("String", "VIEW_URL", "\"http://192.168.86.100:5174/view\"")
-            buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.100:5174/app-login?device=android\"")
-            buildConfigField("String", "VERIFICATION_URL", "\"http://192.168.86.100:5174/auth/device\"")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100.nip.io:5174/\"")
+            buildConfigField("String", "VIEW_URL", "\"http://192.168.86.100.nip.io:5174/view\"")
+            buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.100.nip.io:5174/app-login?device=android\"")
+            buildConfigField("String", "VERIFICATION_URL", "\"http://192.168.86.100.nip.io:5174/auth/device\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "false")
         }
     }

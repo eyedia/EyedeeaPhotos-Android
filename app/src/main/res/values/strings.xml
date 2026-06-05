@@ -11,8 +11,8 @@
     <string name="logout">Logout</string>
     <string name="photo_queue">Photo Queue</string>
     <string name="no_photos_in_queue">No photos in queue. You can share photos from your gallery to Eyedeea Photos or add them here.</string>
-    <string name="next_scheduled_sync">Next scheduled sync: %s</string>
-    <string name="next_scheduled_sync_empty">Next scheduled sync: &#8211;&#8211;:&#8211;&#8211;</string>
+    <string name="next_scheduled_sync">Photos are synced automatically every hour. You can continue adding photos.</string>
+    <string name="next_scheduled_sync_empty">Photos are synced automatically every hour. You can continue adding photos.</string>
     <string name="add_photos">Add Photos</string>
     <string name="sync_now">Sync Now</string>
     <string name="sync_cancel">Cancel</string>
