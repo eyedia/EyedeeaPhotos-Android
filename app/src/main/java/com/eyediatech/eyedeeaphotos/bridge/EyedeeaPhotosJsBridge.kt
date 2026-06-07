@@ -7,7 +7,7 @@ class EyedeeaPhotosJsBridge(
     private val syncCoordinator: OfflineSyncCoordinator
 ) {
     @JavascriptInterface
-    fun requestOfflineSync(jsonPayload: String): Boolean {
+    fun requestOfflineSync(jsonPayload: String?): Boolean {
         return syncCoordinator.onSyncRequested(jsonPayload)
     }
 }
