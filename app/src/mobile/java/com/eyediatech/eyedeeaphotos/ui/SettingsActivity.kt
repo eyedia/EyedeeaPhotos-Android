@@ -18,6 +18,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.work.*
@@ -39,12 +40,16 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
+import com.eyediatech.eyedeeaphotos.data.OfflineSyncSubscription
+import com.eyediatech.eyedeeaphotos.sync.OfflineSyncWorker
+
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var authRepository: AuthRepository
     private lateinit var photoRepository: PhotoRepository
     private lateinit var adapter: PhotoQueueAdapter
+    private lateinit var offlineSyncAdapter: OfflineSyncAdapter
     
     private var isSyncing = false
 
@@ -149,6 +154,46 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.queueRecyclerView.layoutManager = GridLayoutManager(this, 3)
         binding.queueRecyclerView.adapter = adapter
+
+        offlineSyncAdapter = OfflineSyncAdapter(
+            onCancel = { sub ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val dao = AppDatabase.getDatabase(this@SettingsActivity).offlineSyncDao()
+                    val updated = sub.copy(enabled = false)
+                    dao.update(updated)
+                    loadOfflineSubscriptions()
+                }
+            },
+            onRetry = { sub ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val dao = AppDatabase.getDatabase(this@SettingsActivity).offlineSyncDao()
+                    dao.updateStatus(sub.id, "idle")
+                    val req = androidx.work.OneTimeWorkRequestBuilder<OfflineSyncWorker>().build()
+                    val workName = if (sub.type == "album") {
+                        "offline-sync-album-${sub.householdId}-${sub.sourceId}-${sub.folderPath.hashCode()}"
+                    } else {
+                        "offline-sync-pack-${sub.householdId}-${sub.storyPackId}"
+                    }
+                    androidx.work.WorkManager.getInstance(this@SettingsActivity)
+                        .enqueueUniqueWork(workName, androidx.work.ExistingWorkPolicy.REPLACE, req)
+                    loadOfflineSubscriptions()
+                }
+            }
+        )
+        binding.offlineSyncRecyclerView.layoutManager = LinearLayoutManager(this)
+        binding.offlineSyncRecyclerView.adapter = offlineSyncAdapter
+        loadOfflineSubscriptions()
+    }
+
+    private fun loadOfflineSubscriptions() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val dao = AppDatabase.getDatabase(this@SettingsActivity).offlineSyncDao()
+            val subs = dao.getActiveSubscriptions()
+            withContext(Dispatchers.Main) {
+                offlineSyncAdapter.submitList(subs)
+                binding.offlineSyncEmptyText.visibility = if (subs.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
+            }
+        }
     }
 
     private fun showRemoveDialog(photo: QueuedPhoto) {
@@ -463,5 +508,47 @@ class SettingsActivity : AppCompatActivity() {
             override fun areItemsTheSame(oldItem: QueuedPhoto, newItem: QueuedPhoto) = oldItem.id == newItem.id
             override fun areContentsTheSame(oldItem: QueuedPhoto, newItem: QueuedPhoto) = oldItem == newItem
         }
+    }
+
+    class OfflineSyncAdapter(
+        private val onCancel: (OfflineSyncSubscription) -> Unit,
+        private val onRetry: (OfflineSyncSubscription) -> Unit
+    ) : androidx.recyclerview.widget.RecyclerView.Adapter<OfflineSyncAdapter.ViewHolder>() {
+
+        private var items = listOf<OfflineSyncSubscription>()
+
+        fun submitList(newItems: List<OfflineSyncSubscription>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+
+        class ViewHolder(view: android.view.View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {
+            val syncName: android.widget.TextView = view.findViewById(R.id.syncName)
+            val syncPath: android.widget.TextView = view.findViewById(R.id.syncPath)
+            val syncStatus: android.widget.TextView = view.findViewById(R.id.syncStatus)
+            val cancelButton: android.widget.Button = view.findViewById(R.id.cancelButton)
+            val retryButton: android.widget.Button = view.findViewById(R.id.retryButton)
+        }
+
+        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): ViewHolder {
+            val view = android.view.LayoutInflater.from(parent.context).inflate(R.layout.item_offline_sync, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = items[position]
+            holder.syncName.text = item.displayName
+            holder.syncPath.text = item.folderPath ?: "Story Pack: ${item.displayName}"
+            
+            val statusText = "Status: ${item.status} | Size: ${item.downloadVariant}"
+            holder.syncStatus.text = statusText
+
+            holder.retryButton.visibility = if (item.status == "limit_blocked" || item.status == "error") android.view.View.VISIBLE else android.view.View.GONE
+
+            holder.cancelButton.setOnClickListener { onCancel(item) }
+            holder.retryButton.setOnClickListener { onRetry(item) }
+        }
+
+        override fun getItemCount() = items.size
     }
 }

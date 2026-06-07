@@ -296,6 +296,13 @@ class MainActivity : AppCompatActivity() {
         // Enable maximum performance
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
+        // Setup JS Bridge for Offline Sync
+        val syncCoordinator = com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator(this)
+        webView.addJavascriptInterface(
+            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(syncCoordinator),
+            "EyedeeaPhotosNativeBridge"
+        )
+
         // --- Download Logic ---
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
             handleDownload(url, userAgent, contentDisposition, mimetype)

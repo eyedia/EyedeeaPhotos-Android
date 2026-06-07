@@ -59,6 +59,13 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+        // Setup JS Bridge for Offline Sync
+        val syncCoordinator = com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator(this)
+        binding.webView.addJavascriptInterface(
+            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(syncCoordinator),
+            "EyedeeaPhotosNativeBridge"
+        )
+
         binding.webView.webViewClient = object : android.webkit.WebViewClient() {
             private fun checkUrlAndInjectToken(view: WebView?, url: String?) {
                 if (url == null) return

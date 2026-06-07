@@ -60,7 +60,45 @@ interface ApiService {
         @Path("householdId") householdId: String,
         @Path("sourceId") sourceId: String
     ): Response<ScanStatus>
+
+    // Offline Sync Endpoints
+    @GET
+    fun getPhotoManifest(
+        @Header("Authorization") token: String,
+        @Url url: String
+    ): retrofit2.Call<okhttp3.ResponseBody>
+
+    @Streaming
+    @GET("/api/v1/{householdId}/view/photos/{photo_id}")
+    fun downloadPhoto(
+        @Header("Authorization") token: String,
+        @Path("householdId") householdId: String,
+        @Path("photo_id") photoId: String,
+        @Query("download") download: Boolean = true,
+        @Query("size") size: String? = null,
+        @Query("original") original: Boolean? = null
+    ): retrofit2.Call<okhttp3.ResponseBody>
+
+    @Streaming
+    @POST("/api/v1/photos/download-zip")
+    fun downloadZip(
+        @Header("Authorization") token: String,
+        @Body request: DownloadZipRequest
+    ): retrofit2.Call<okhttp3.ResponseBody>
 }
 
 data class Source(val id: String, val name: String)
 data class ScanStatus(val active: Boolean)
+
+data class DownloadZipRequest(
+    val size: String?,
+    val original: Boolean? = null,
+    val photoIds: List<ZipPhotoEntry>
+)
+
+data class ZipPhotoEntry(
+    val photo_id: String,
+    val source_id: Long,
+    val filename: String,
+    val folder_name: String
+)
