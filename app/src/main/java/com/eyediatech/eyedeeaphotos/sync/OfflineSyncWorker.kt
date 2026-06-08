@@ -245,16 +245,22 @@ class OfflineSyncWorker(
         val contentValues = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, filename)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
-            put(MediaStore.Images.Media.IS_PENDING, 1)
+            
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
         }
 
         val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
         if (uri != null) {
             resolver.openOutputStream(uri)?.use { it.write(bytes) }
-            contentValues.clear()
-            contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-            resolver.update(uri, contentValues, null, null)
+            
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                contentValues.clear()
+                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, contentValues, null, null)
+            }
         }
     }
 }

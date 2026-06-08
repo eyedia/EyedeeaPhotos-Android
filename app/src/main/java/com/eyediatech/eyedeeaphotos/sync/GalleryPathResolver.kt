@@ -8,11 +8,12 @@ object GalleryPathResolver {
      * Converts a server curated path to MediaStore RELATIVE_PATH (includes Pictures/ prefix).
      *
      * Input:  "curated/2021-2025/2025/Weekend Trip"
-     * Output: "Pictures/Eyedeea/2021-2025/2025/Weekend Trip"
+     * Output: "Pictures/Eyedeea Photos/2021-2025/2025/Weekend Trip/"
      */
     fun curatedPathToRelativePath(curatedFolderPath: String): String {
         val segments = curatedPathToSegments(curatedFolderPath)
-        return (listOf("Pictures", "Eyedeea") + segments).joinToString("/")
+        val joined = (listOf("Pictures", "Eyedeea Photos") + segments).joinToString("/")
+        return if (joined.endsWith("/")) joined else "$joined/"
     }
 
     /**
