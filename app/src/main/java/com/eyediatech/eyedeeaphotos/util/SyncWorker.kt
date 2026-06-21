@@ -61,6 +61,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 return Result.success()
             }
 
+            // Determine folder name based on user
+            val username = authRepository.getUsername() ?: "user"
+            val prefix = username.filter { it.isLetterOrDigit() }.take(6).lowercase()
+            val folderName = if (prefix.isNotEmpty()) "${prefix}_droid" else "android"
+
             // 2. Batch Upload
             val batchSize = 20
             val batches = photosToUpload.chunked(batchSize)
@@ -68,7 +73,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             
             for ((index, batch) in batches.withIndex()) {
                 Log.d("SyncWorker", "Uploading batch ${index + 1}/${batches.size}")
-                uploadBatch(batch, token, householdId, sourceId)
+                uploadBatch(batch, token, householdId, sourceId, folderName)
             }
 
             // 3. Explicit Scan Trigger
@@ -85,7 +90,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         }
     }
 
-    private suspend fun uploadBatch(batch: List<QueuedPhoto>, token: String, householdId: String, sourceId: String) {
+    private suspend fun uploadBatch(batch: List<QueuedPhoto>, token: String, householdId: String, sourceId: String, folderName: String) {
         val photosParts = mutableListOf<MultipartBody.Part>()
         val relativePathsParts = mutableListOf<okhttp3.RequestBody>()
 
@@ -96,7 +101,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                 photosParts.add(MultipartBody.Part.createFormData("photos", file.name, requestFile))
                 
-                val relativePath = "android/${file.name}".toRequestBody("text/plain".toMediaTypeOrNull())
+                val relativePath = "$folderName/${file.name}".toRequestBody("text/plain".toMediaTypeOrNull())
                 relativePathsParts.add(relativePath)
                 
                 photoRepository.updateStatus(photo.id, "UPLOADING")

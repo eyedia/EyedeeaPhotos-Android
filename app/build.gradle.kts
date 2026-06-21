@@ -19,7 +19,7 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.eyediatech.eyedeeaphotos"
-    compileSdk = 34
+    compileSdk = 35
 
     signingConfigs {
         create("release") {
@@ -44,7 +44,6 @@ android {
         create("mobile") {
             dimension = "platform"
             buildConfigField("boolean", "ENABLE_DOWNLOADS", "true")
-            applicationIdSuffix = ".mobile"
         }
     }
 
@@ -67,9 +66,9 @@ android {
     defaultConfig {
         applicationId = "com.eyediatech.eyedeeaphotos"
         minSdk = 21
-        targetSdk = 34
-        versionCode = 6
-        versionName = "1.5"
+        targetSdk = 35
+        versionCode = 7
+        versionName = "1.6"
         vectorDrawables.useSupportLibrary = true
     }
 
