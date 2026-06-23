@@ -37,6 +37,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
@@ -165,7 +167,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+        
         android.util.Log.d("AUTH_DEBUG", "MainActivity onCreate - Authenticated: ${AuthRepository(this).isAuthenticated()}")
         setContentView(R.layout.activity_main)
 

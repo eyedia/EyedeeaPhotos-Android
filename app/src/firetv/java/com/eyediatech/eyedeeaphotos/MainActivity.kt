@@ -10,6 +10,8 @@ import com.eyediatech.eyedeeaphotos.databinding.ActivityMainBinding
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.ui.LoginActivity
 
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+
 class MainActivity : FragmentActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -17,6 +19,7 @@ class MainActivity : FragmentActivity() {
     private var tokenInjectionCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         
         authRepository = AuthRepository(this)
@@ -145,14 +148,23 @@ class MainActivity : FragmentActivity() {
                 checkUrlAndInjectToken(view, url)
             }
 
+            @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.M)
             override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
                 super.onReceivedError(view, request, error)
-                val msg = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    error?.description.toString()
-                } else {
-                    "Error loading page"
+                if (request?.isForMainFrame == true) {
+                    val msg = error?.description.toString()
+                    Log.e("WEBVIEW_DEBUG", "Error: $msg")
+                    handleLoadError()
                 }
-                Log.e("WEBVIEW_DEBUG", "Error: $msg")
+            }
+
+            @Suppress("OverridingDeprecatedMember", "DEPRECATION")
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                super.onReceivedError(view, errorCode, description, failingUrl)
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+                    Log.e("WEBVIEW_DEBUG", "Error: $description")
+                    handleLoadError()
+                }
             }
 
             override fun onReceivedSslError(view: WebView?, handler: android.webkit.SslErrorHandler?, error: android.net.http.SslError?) {
@@ -184,6 +196,12 @@ class MainActivity : FragmentActivity() {
         // Start at the view page. If not authenticated, the web app will redirect to login/root,
         // which we catch in onPageFinished, inject the token, and redirect back.
         binding.webView.loadUrl(BuildConfig.VIEW_URL)
+    }
+
+    private fun handleLoadError() {
+        runOnUiThread {
+            binding.webView.loadUrl("file:///android_asset/error.html")
+        }
     }
 
     private fun injectTokenIntoLocalStorage(webView: WebView?) {
