@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="80dp"
+        android:layout_marginBottom="128dp"
         android:orientation="vertical"
         android:visibility="gone"
         android:gravity="center_horizontal">
@@ -79,7 +79,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="64dp">
 
         <ImageView
             android:id="@+id/settingsIcon"

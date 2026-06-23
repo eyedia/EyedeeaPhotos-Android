@@ -372,10 +372,10 @@ class MainActivity : AppCompatActivity() {
                     if (uri != null) {
                         val baseUrlUri = Uri.parse(BuildConfig.BASE_URL)
                         
-                        // Check if the URL belongs to our backend host
-                        if (uri.host == baseUrlUri.host) {
+                        // Check if the URL belongs to our backend host (fuzzy match for production, exact for debug)
+                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
                             val path = uri.path ?: ""
-                            // Anything that is the root page, login page, or home page
+                            // The API team redirects to /app-login for unauthenticated apps
                             val isUnauthenticatedPage = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
                             
                             if (isUnauthenticatedPage) {
@@ -392,6 +392,46 @@ class MainActivity : AppCompatActivity() {
                         view?.visibility = View.VISIBLE
                     }
                 }
+            }
+
+            @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val uri = request?.url
+                if (uri != null && authRepository.isAuthenticated()) {
+                    val baseUrlUri = Uri.parse(BuildConfig.BASE_URL)
+                    if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                        val path = uri.path ?: ""
+                        if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                            Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading. URL: ${request.url}")
+                            view?.visibility = View.INVISIBLE
+                            injectTokenIntoLocalStorage()
+                            return true
+                        }
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, request)
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url != null && authRepository.isAuthenticated()) {
+                    try {
+                        val uri = Uri.parse(url)
+                        val baseUrlUri = Uri.parse(BuildConfig.BASE_URL)
+                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                            val path = uri.path ?: ""
+                            if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                                Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
+                                view?.visibility = View.INVISIBLE
+                                injectTokenIntoLocalStorage()
+                                return true
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Ignore parse errors and let the WebView handle it
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, url)
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -568,10 +608,16 @@ class MainActivity : AppCompatActivity() {
 
         val token = authRepository.getToken() ?: return
         val refreshToken = authRepository.getRefreshToken() ?: ""
-        val userJson = authRepository.getUserJson() ?: "{}"
+        val userJsonRaw = authRepository.getUserJson()
+        val userJson = if (userJsonRaw.isNullOrBlank()) "{}" else userJsonRaw
         val role = authRepository.getGroup() ?: "user"
         val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-        val libraryUrl = "$baseUrl/library"
+        
+        val libraryUrl = if (role == "user" || role == "auth_user" || role == "public_user") {
+            "$baseUrl/pricing"
+        } else {
+            "$baseUrl/library"
+        }
 
         // Escape backslashes and single quotes for JS
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
@@ -583,7 +629,14 @@ class MainActivity : AppCompatActivity() {
                     if ('$refreshToken' !== '') {
                         localStorage.setItem('refresh_token', '$refreshToken');
                     }
-                    localStorage.setItem('auth_user', '$escapedUserJson');
+                    var userObj = {};
+                    try {
+                        userObj = JSON.parse('$escapedUserJson');
+                    } catch (e) {
+                        console.error('Failed to parse user JSON', e);
+                    }
+                    userObj.role = '$role';
+                    localStorage.setItem('auth_user', JSON.stringify(userObj));
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');
                     window.location.replace('$libraryUrl');

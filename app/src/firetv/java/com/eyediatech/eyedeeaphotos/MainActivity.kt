@@ -74,7 +74,7 @@ class MainActivity : FragmentActivity() {
                     if (uri != null) {
                         val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
                         
-                        if (uri.host == baseUrlUri.host) {
+                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
                             val path = uri.path ?: ""
                             val isUnauthenticatedPage = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
                             
@@ -92,6 +92,46 @@ class MainActivity : FragmentActivity() {
                         view?.visibility = android.view.View.VISIBLE
                     }
                 }
+            }
+
+            @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.LOLLIPOP)
+            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                val uri = request?.url
+                if (uri != null && authRepository.isAuthenticated()) {
+                    val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
+                    if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                        val path = uri.path ?: ""
+                        if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                            Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading. URL: ${request.url}")
+                            view?.visibility = android.view.View.INVISIBLE
+                            injectTokenIntoLocalStorage(view)
+                            return true
+                        }
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, request)
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url != null && authRepository.isAuthenticated()) {
+                    try {
+                        val uri = android.net.Uri.parse(url)
+                        val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
+                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                            val path = uri.path ?: ""
+                            if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                                Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
+                                view?.visibility = android.view.View.INVISIBLE
+                                injectTokenIntoLocalStorage(view)
+                                return true
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Ignore parse errors and let the WebView handle it
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, url)
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -158,9 +198,16 @@ class MainActivity : FragmentActivity() {
 
         val token = authRepository.getToken() ?: return
         val refreshToken = authRepository.getRefreshToken() ?: ""
-        val userJson = authRepository.getUserJson() ?: "{}"
+        val userJsonRaw = authRepository.getUserJson()
+        val userJson = if (userJsonRaw.isNullOrBlank()) "{}" else userJsonRaw
         val role = authRepository.getGroup() ?: "user"
-        val viewUrl = BuildConfig.VIEW_URL
+        
+        val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
+        val targetUrl = if (role == "user" || role == "auth_user" || role == "public_user") {
+            "$baseUrl/pricing"
+        } else {
+            BuildConfig.VIEW_URL
+        }
 
         // Escape backslashes and single quotes for JS
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
@@ -172,10 +219,17 @@ class MainActivity : FragmentActivity() {
                     if ('$refreshToken' !== '') {
                         localStorage.setItem('refresh_token', '$refreshToken');
                     }
-                    localStorage.setItem('auth_user', '$escapedUserJson');
+                    var userObj = {};
+                    try {
+                        userObj = JSON.parse('$escapedUserJson');
+                    } catch (e) {
+                        console.error('Failed to parse user JSON', e);
+                    }
+                    userObj.role = '$role';
+                    localStorage.setItem('auth_user', JSON.stringify(userObj));
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');
-                    window.location.replace('$viewUrl');
+                    window.location.replace('$targetUrl');
                 } catch (e) {
                     console.error('Injection failed: ' + e);
                 }
