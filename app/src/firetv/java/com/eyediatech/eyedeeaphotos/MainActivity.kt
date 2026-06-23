@@ -17,6 +17,18 @@ class MainActivity : FragmentActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var authRepository: AuthRepository
     private var tokenInjectionCount = 0
+    private var isAtViewPage = false
+
+    private fun updateKeepAwake(url: String?) {
+        val isAtView = url?.contains("/view", ignoreCase = true) == true
+        if (isAtView == isAtViewPage) return
+        isAtViewPage = isAtView
+        if (isAtView) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -139,12 +151,14 @@ class MainActivity : FragmentActivity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                updateKeepAwake(url)
                 checkUrlAndInjectToken(view, url)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 binding.progressBar.visibility = android.view.View.GONE
+                updateKeepAwake(url)
                 checkUrlAndInjectToken(view, url)
             }
 
@@ -181,6 +195,7 @@ class MainActivity : FragmentActivity() {
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
+                updateKeepAwake(url)
                 checkUrlAndInjectToken(view, url)
             }
             

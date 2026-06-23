@@ -173,8 +173,6 @@ class MainActivity : AppCompatActivity() {
         android.util.Log.d("AUTH_DEBUG", "MainActivity onCreate - Authenticated: ${AuthRepository(this).isAuthenticated()}")
         setContentView(R.layout.activity_main)
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
         // Initialize shared preferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         authRepository = AuthRepository(this)
@@ -219,12 +217,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val serviceIntent = Intent(this, KeepAwakeService::class.java) 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
-            startForegroundService(serviceIntent) 
-        } else { 
-            startService(serviceIntent) 
-        } 
+        if (isAtViewPage) {
+            val serviceIntent = Intent(this, KeepAwakeService::class.java) 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                startForegroundService(serviceIntent) 
+            } else { 
+                startService(serviceIntent) 
+            } 
+        }
         val refreshIntervalMinutes = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60)
         if (refreshIntervalMinutes > 0) {
             val refreshInterval = refreshIntervalMinutes.toLong() * 60000
@@ -264,9 +264,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var isAtViewPage = false
+
+    private fun updateKeepAwake(isAtView: Boolean) {
+        if (isAtView == isAtViewPage) return
+        isAtViewPage = isAtView
+        val serviceIntent = Intent(this, KeepAwakeService::class.java)
+        if (isAtView) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
+                startForegroundService(serviceIntent) 
+            } else { 
+                startService(serviceIntent) 
+            }
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            stopService(serviceIntent)
+        }
+    }
+
     private fun updateSettingsIconVisibility(url: String?) {
         val isAtView = url?.contains("/view", ignoreCase = true) == true
         Log.d("UI_DEBUG", "Updating icon visibility. URL: $url, isAtView: $isAtView")
+        
+        updateKeepAwake(isAtView)
+
         val visibility = if (isAtView) View.GONE else View.VISIBLE
         settingsIcon?.visibility = visibility
         settingsButtonContainer?.visibility = visibility
