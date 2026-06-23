@@ -66,22 +66,47 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             val prefix = username.filter { it.isLetterOrDigit() }.take(6).lowercase()
             val folderName = if (prefix.isNotEmpty()) "${prefix}_droid" else "android"
 
-            // 2. Batch Upload
-            val batchSize = 20
-            val batches = photosToUpload.chunked(batchSize)
-            Log.d("SyncWorker", "Starting upload of ${photosToUpload.size} photos in ${batches.size} batches")
-            
-            for ((index, batch) in batches.withIndex()) {
-                Log.d("SyncWorker", "Uploading batch ${index + 1}/${batches.size}")
-                uploadBatch(batch, token, householdId, sourceId, folderName)
+            val (curatedPhotos, rawPhotos) = photosToUpload.partition { it.destinationAlbum != null }
+
+            // 2. Batch Upload Raw Photos
+            if (rawPhotos.isNotEmpty()) {
+                val batchSize = 20
+                val batches = rawPhotos.chunked(batchSize)
+                Log.d("SyncWorker", "Starting upload of ${rawPhotos.size} raw photos in ${batches.size} batches")
+                
+                for ((index, batch) in batches.withIndex()) {
+                    Log.d("SyncWorker", "Uploading raw batch ${index + 1}/${batches.size}")
+                    uploadBatch(batch, token, householdId, sourceId, folderName, scanAfterUpload = true)
+                }
+
+                // 3. Explicit Scan Trigger for Raw
+                Log.d("SyncWorker", "Triggering scan for raw processing...")
+                val scanResponse = RetrofitClient.instance.triggerScan(
+                    "Bearer $token", householdId, sourceId, "raw", "background", 4
+                )
+                Log.d("SyncWorker", "Scan trigger result: ${scanResponse.code()}")
             }
 
-            // 3. Explicit Scan Trigger
-            Log.d("SyncWorker", "Triggering scan for processing...")
-            val scanResponse = RetrofitClient.instance.triggerScan(
-                "Bearer $token", householdId, sourceId, "raw", "background", 4
-            )
-            Log.d("SyncWorker", "Scan trigger result: ${scanResponse.code()}")
+            // 4. Batch Upload Curated Photos
+            if (curatedPhotos.isNotEmpty()) {
+                val byAlbum = curatedPhotos.groupBy { it.destinationAlbum!! }
+                for ((albumPath, albumPhotos) in byAlbum) {
+                    val batchSize = 20
+                    val batches = albumPhotos.chunked(batchSize)
+                    Log.d("SyncWorker", "Starting upload of ${albumPhotos.size} curated photos to $albumPath")
+                    
+                    val allUploadedFiles = mutableListOf<com.eyediatech.eyedeeaphotos.data.UploadedFile>()
+                    for ((index, batch) in batches.withIndex()) {
+                        Log.d("SyncWorker", "Uploading curated batch ${index + 1}/${batches.size} to $albumPath")
+                        val uploadedFiles = uploadBatch(batch, token, householdId, sourceId, albumPath, scanAfterUpload = false)
+                        allUploadedFiles.addAll(uploadedFiles)
+                    }
+
+                    if (allUploadedFiles.isNotEmpty()) {
+                        triggerCuratedAnalysis(token, householdId, sourceId, albumPath, allUploadedFiles)
+                    }
+                }
+            }
 
             return Result.success()
         } catch (e: Exception) {
@@ -90,7 +115,14 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         }
     }
 
-    private suspend fun uploadBatch(batch: List<QueuedPhoto>, token: String, householdId: String, sourceId: String, folderName: String) {
+    private suspend fun uploadBatch(
+        batch: List<QueuedPhoto>, 
+        token: String, 
+        householdId: String, 
+        sourceId: String, 
+        folderName: String, 
+        scanAfterUpload: Boolean
+    ): List<com.eyediatech.eyedeeaphotos.data.UploadedFile> {
         val photosParts = mutableListOf<MultipartBody.Part>()
         val relativePathsParts = mutableListOf<okhttp3.RequestBody>()
 
@@ -101,7 +133,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                 photosParts.add(MultipartBody.Part.createFormData("photos", file.name, requestFile))
                 
-                val relativePath = "$folderName/${file.name}".toRequestBody("text/plain".toMediaTypeOrNull())
+                val relPathStr = if (scanAfterUpload) "$folderName/${file.name}" else file.name
+                val relativePath = relPathStr.toRequestBody("text/plain".toMediaTypeOrNull())
                 relativePathsParts.add(relativePath)
                 
                 photoRepository.updateStatus(photo.id, "UPLOADING")
@@ -110,14 +143,17 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             }
         }
 
-        if (photosParts.isEmpty()) return
+        if (photosParts.isEmpty()) return emptyList()
 
-        val folderPath = "raw".toRequestBody("text/plain".toMediaTypeOrNull())
-        val scanAfterUpload = "true".toRequestBody("text/plain".toMediaTypeOrNull())
+        // For curated upload, folderPath is the destination folder (e.g. curated/...)
+        // For raw, it is "raw"
+        val folderPathStr = if (scanAfterUpload) "raw" else folderName
+        val folderPath = folderPathStr.toRequestBody("text/plain".toMediaTypeOrNull())
+        val scanAfterUploadBody = scanAfterUpload.toString().toRequestBody("text/plain".toMediaTypeOrNull())
         val authHeader = "Bearer $token"
 
         val response = RetrofitClient.instance.uploadPhotos(
-            authHeader, householdId, sourceId, folderPath, scanAfterUpload, photosParts, relativePathsParts.toTypedArray()
+            authHeader, householdId, sourceId, folderPath, scanAfterUploadBody, photosParts, relativePathsParts.toTypedArray()
         )
 
         Log.d("SyncWorker", "Upload API response code: ${response.code()}")
@@ -129,6 +165,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 if (file.exists()) file.delete()
                 photoRepository.delete(photo)
             }
+            return response.body()?.uploaded ?: emptyList()
         } else {
             val errorMsg = response.errorBody()?.string() ?: "Unknown error"
             Log.e("SyncWorker", "Batch upload failed: $errorMsg")
@@ -136,6 +173,90 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 photoRepository.updateStatus(photo.id, "FAILED")
             }
             throw Exception("Batch upload failed: $errorMsg")
+        }
+    }
+
+    private suspend fun triggerCuratedAnalysis(
+        token: String, 
+        householdId: String, 
+        sourceId: String, 
+        albumPath: String, 
+        uploadedFiles: List<com.eyediatech.eyedeeaphotos.data.UploadedFile>
+    ) {
+        val isoFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+        isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val generatedAt = isoFormat.format(java.util.Date())
+        val idempotencyKey = "curated-${System.currentTimeMillis()}-android"
+
+        val curatedFiles = uploadedFiles.mapIndexed { index, file ->
+            val mimeType = if (file.name.lowercase().endsWith(".png")) "image/png" else "image/jpeg"
+            com.eyediatech.eyedeeaphotos.data.CuratedUploadFile(
+                id = "file_${index + 1}",
+                relative_path = file.name,
+                name = file.name,
+                size_bytes = file.size,
+                mime_type = mimeType,
+                last_modified_ms = null,
+                sha256_hash = null,
+                source = "new_upload",
+                status = "accepted",
+                skip_reason = null
+            )
+        }
+
+        val summary = com.eyediatech.eyedeeaphotos.data.CuratedUploadSummary(
+            total_files = curatedFiles.size,
+            uploaded_count = curatedFiles.size,
+            skipped_count = 0,
+            by_skip_reason = emptyMap()
+        )
+
+        val uploadId = "upload_1"
+        val curatedUpload = com.eyediatech.eyedeeaphotos.data.CuratedUpload(
+            id = uploadId,
+            destination_path = albumPath,
+            summary = summary,
+            files = curatedFiles
+        )
+
+        val topLevel = com.eyediatech.eyedeeaphotos.data.CuratedRequestTopLevel(
+            schema_version = "curated-request-v1",
+            idempotency_key = idempotencyKey,
+            generated_at = generatedAt,
+            household_id = householdId.toLong(),
+            source_id = sourceId.toLong(),
+            dir_type = "curated",
+            process_count = 4,
+            insert_into_db = true,
+            current_folder_path = albumPath
+        )
+
+        val curatedRequest = com.eyediatech.eyedeeaphotos.data.CuratedRequest(
+            top_level = topLevel,
+            uploads = listOf(curatedUpload),
+            operations = emptyList()
+        )
+
+        val request = com.eyediatech.eyedeeaphotos.data.BulkOperationsRequest(
+            schema_version = "curated-request-v1",
+            job_code = "analyze_photos_curated",
+            idempotency_key = idempotencyKey,
+            generated_at = generatedAt,
+            household_id = householdId.toLong(),
+            source_id = sourceId.toLong(),
+            dir_type = "curated",
+            process_count = 4,
+            insert_into_db = true,
+            curated_request = curatedRequest
+        )
+
+        val response = RetrofitClient.instance.bulkOperations(
+            "Bearer $token", householdId, sourceId, request
+        )
+
+        Log.d("SyncWorker", "Trigger curated analysis response code: ${response.code()}")
+        if (!response.isSuccessful) {
+            Log.e("SyncWorker", "Trigger curated analysis failed: ${response.errorBody()?.string()}")
         }
     }
 }

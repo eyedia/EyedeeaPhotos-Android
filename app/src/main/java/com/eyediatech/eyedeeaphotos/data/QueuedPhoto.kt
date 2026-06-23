@@ -10,5 +10,6 @@ data class QueuedPhoto(
     val internalPath: String,
     val fileName: String,
     val addedTimestamp: Long = System.currentTimeMillis(),
-    val status: String = "PENDING" // PENDING, UPLOADING, FAILED
+    val status: String = "PENDING", // PENDING, UPLOADING, FAILED
+    val destinationAlbum: String? = null
 )

@@ -42,7 +42,15 @@ interface ApiService {
         @Part("scanAfterUpload") scanAfterUpload: okhttp3.RequestBody,
         @Part photos: List<okhttp3.MultipartBody.Part>,
         @Part("relativePaths") relativePaths: Array<okhttp3.RequestBody>
-    ): Response<EnhancedUploadResponse>
+    ): Response<com.eyediatech.eyedeeaphotos.data.EnhancedUploadResponse>
+
+    @POST("/api/v1/{householdId}/sources/{sourceId}/browse/bulk-operations")
+    suspend fun bulkOperations(
+        @Header("Authorization") token: String,
+        @Path("householdId") householdId: String,
+        @Path("sourceId") sourceId: String,
+        @Body request: com.eyediatech.eyedeeaphotos.data.BulkOperationsRequest
+    ): Response<com.eyediatech.eyedeeaphotos.data.BulkOperationsResponse>
 
     @POST("/api/v1/{householdId}/sources/{sourceId}/scan")
     suspend fun triggerScan(

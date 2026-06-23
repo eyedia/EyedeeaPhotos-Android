@@ -68,6 +68,8 @@ class MainActivity : AppCompatActivity() {
         pickImagesLauncher.launch("image/*")
     }
 
+    private var pendingDestinationAlbum: String? = null
+
     private fun checkLocationPermissionAndPickImages() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(
@@ -82,6 +84,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun queuePhotos(uris: List<Uri>) {
+        val destAlbum = pendingDestinationAlbum
+        pendingDestinationAlbum = null
         lifecycleScope.launch {
             Toast.makeText(this@MainActivity, "Your photos are queued and will sync soon.", Toast.LENGTH_LONG).show()
             withContext(Dispatchers.IO) {
@@ -91,7 +95,8 @@ class MainActivity : AppCompatActivity() {
                         val queuedPhoto = com.eyediatech.eyedeeaphotos.data.QueuedPhoto(
                             fileUri = uri.toString(),
                             internalPath = internalFile.absolutePath,
-                            fileName = internalFile.name
+                            fileName = internalFile.name,
+                            destinationAlbum = destAlbum
                         )
                         photoRepository.insert(queuedPhoto)
                     }
@@ -353,7 +358,51 @@ class MainActivity : AppCompatActivity() {
             
             uploadIcon?.setOnClickListener {
                 toggleMenu()
-                checkLocationPermissionAndPickImages()
+                
+                val currentUrl = webView.url
+                var isCuratedAlbum = false
+                var albumPath = ""
+                
+                if (currentUrl != null && currentUrl.contains("tab=browse")) {
+                    val uri = try { Uri.parse(currentUrl) } catch (e: Exception) { null }
+                    if (uri != null) {
+                        val tab = uri.getQueryParameter("tab")
+                        val browseMode = uri.getQueryParameter("browseMode")
+                        val path = uri.getQueryParameter("albumPath")
+                        
+                        if (tab == "browse" && browseMode == null && path != null && path.startsWith("curated/")) {
+                            val parts = path.split("/")
+                            // Example: curated/2021-2025/2025/Weekend Trip -> 4 parts
+                            if (parts.size >= 4) {
+                                isCuratedAlbum = true
+                                albumPath = path
+                            }
+                        }
+                    }
+                }
+                
+                if (isCuratedAlbum) {
+                    val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+                    val view = layoutInflater.inflate(R.layout.bottom_sheet_upload_options, null)
+                    
+                    view.findViewById<View>(R.id.optionCurrentAlbum).setOnClickListener {
+                        pendingDestinationAlbum = albumPath
+                        bottomSheetDialog.dismiss()
+                        checkLocationPermissionAndPickImages()
+                    }
+                    
+                    view.findViewById<View>(R.id.optionRawCurate).setOnClickListener {
+                        pendingDestinationAlbum = null
+                        bottomSheetDialog.dismiss()
+                        checkLocationPermissionAndPickImages()
+                    }
+                    
+                    bottomSheetDialog.setContentView(view)
+                    bottomSheetDialog.show()
+                } else {
+                    pendingDestinationAlbum = null
+                    checkLocationPermissionAndPickImages()
+                }
             }
             
             settingsActionIcon?.setOnClickListener {
