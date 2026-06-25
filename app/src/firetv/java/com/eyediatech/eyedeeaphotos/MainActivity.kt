@@ -96,7 +96,9 @@ class MainActivity : FragmentActivity() {
                             if (isUnauthenticatedPage) {
                                 Log.d("AUTH_DEBUG", "Detected unauthenticated page while authenticated locally. URL: $url")
                                 view?.visibility = android.view.View.INVISIBLE
-                                injectTokenIntoLocalStorage(view)
+                                view?.post {
+                                    injectTokenIntoLocalStorage(view)
+                                }
                             } else {
                                 view?.visibility = android.view.View.VISIBLE
                             }
@@ -119,7 +121,9 @@ class MainActivity : FragmentActivity() {
                         if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
                             Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading. URL: ${request.url}")
                             view?.visibility = android.view.View.INVISIBLE
-                            injectTokenIntoLocalStorage(view)
+                            view?.post {
+                                injectTokenIntoLocalStorage(view)
+                            }
                             return true
                         }
                     }
@@ -138,7 +142,9 @@ class MainActivity : FragmentActivity() {
                             if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
                                 Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
                                 view?.visibility = android.view.View.INVISIBLE
-                                injectTokenIntoLocalStorage(view)
+                                view?.post {
+                                    injectTokenIntoLocalStorage(view)
+                                }
                                 return true
                             }
                         }
@@ -152,6 +158,19 @@ class MainActivity : FragmentActivity() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 updateKeepAwake(url)
+                
+                if (url != null && authRepository.isAuthenticated()) {
+                    try {
+                        val uri = android.net.Uri.parse(url)
+                        val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
+                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                            view?.post {
+                                injectTokenOnly(view)
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+
                 checkUrlAndInjectToken(view, url)
             }
 
@@ -211,6 +230,41 @@ class MainActivity : FragmentActivity() {
         // Start at the view page. If not authenticated, the web app will redirect to login/root,
         // which we catch in onPageFinished, inject the token, and redirect back.
         binding.webView.loadUrl(BuildConfig.VIEW_URL)
+    }
+
+    private fun injectTokenOnly(webView: WebView?) {
+        val token = authRepository.getToken() ?: return
+        val refreshToken = authRepository.getRefreshToken() ?: ""
+        val userJsonRaw = authRepository.getUserJson()
+        val userJson = if (userJsonRaw.isNullOrBlank()) "{}" else userJsonRaw
+        val role = authRepository.getGroup() ?: "user"
+
+        val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
+
+        val js = """
+            (function() {
+                try {
+                    localStorage.setItem('auth_token', '$token');
+                    if ('$refreshToken' !== '') {
+                        localStorage.setItem('refresh_token', '$refreshToken');
+                    }
+                    var userObj = {};
+                    try {
+                        userObj = JSON.parse('$escapedUserJson');
+                    } catch (e) {
+                        console.error('Failed to parse user JSON', e);
+                    }
+                    userObj.role = '$role';
+                    localStorage.setItem('auth_user', JSON.stringify(userObj));
+                    localStorage.setItem('auth_group', '$role');
+                    console.log('Proactive token injection successful');
+                } catch (e) {
+                    console.error('Proactive injection failed: ' + e);
+                }
+            })();
+        """.trimIndent()
+
+        webView?.evaluateJavascript(js, null)
     }
 
     private fun handleLoadError() {
