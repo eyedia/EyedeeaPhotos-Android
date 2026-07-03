@@ -25,6 +25,10 @@
     <string name="adding_photos">Adding %1$d photos&#8230;</string>
 
     <!-- Login Screen -->
+    <string name="login_error_title">Login Error</string>
+    <string name="login_error_incomplete_account">This account does not have an active subscription or complete profile. Please log in with the correct account.</string>
+    <string name="login_error_generic">Authentication failed. Please try again with the correct account.</string>
+    <string name="ok">OK</string>
     <string name="login_instruction">Open your Eyedeea Photos mobile app to enter the code:</string>
     <string name="user_code_placeholder">----</string>
     <string name="login_failure_message">Failed to get code. Please try again later.</string>

@@ -4,10 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.eyediatech.eyedeeaphotos.BuildConfig
 import com.eyediatech.eyedeeaphotos.MainActivity
+import com.eyediatech.eyedeeaphotos.R
 import com.eyediatech.eyedeeaphotos.databinding.ActivityLoginBinding
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 
@@ -41,6 +42,14 @@ class LoginActivity : AppCompatActivity() {
     private fun handleDeepLink(intent: Intent) {
         val data: Uri? = intent.data
         if (data != null && data.scheme == "eyedeea" && data.host == "auth") {
+            val error = data.getQueryParameter("error")
+            val errorDescription = data.getQueryParameter("error_description")
+
+            if (!error.isNullOrBlank()) {
+                showErrorDialog(getString(R.string.login_error_title), errorDescription ?: getString(R.string.login_error_generic))
+                return
+            }
+
             val refreshToken = data.getQueryParameter("refresh_token")
             val token = data.getQueryParameter("token")
             val name = data.getQueryParameter("name")
@@ -53,9 +62,17 @@ class LoginActivity : AppCompatActivity() {
                 authRepository.saveAuthData(token, refreshToken, householdId, sourceId, name, userJson ?: "", group)
                 navigateToMain()
             } else {
-                Toast.makeText(this, "Login failed: Missing data", Toast.LENGTH_SHORT).show()
+                showErrorDialog(getString(R.string.login_error_title), getString(R.string.login_error_incomplete_account))
             }
         }
+    }
+
+    private fun showErrorDialog(title: String, message: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(getString(R.string.ok)) { dialog, _ -> dialog.dismiss() }
+            .show()
     }
 
     private fun setupMobileLogin() {
@@ -63,7 +80,7 @@ class LoginActivity : AppCompatActivity() {
         binding.browserLoginButton.setOnClickListener {
             val timestamp = System.currentTimeMillis()
             val encodedCallback = Uri.encode("eyedeea://auth?t=$timestamp")
-            val loginUrl = "${BuildConfig.LOGIN_URL}&callback=$encodedCallback"
+            val loginUrl = "${BuildConfig.LOGIN_URL}&callback=$encodedCallback&prompt=select_account&device=android"
             
             android.util.Log.d("LOGIN_DEBUG", "Navigating to Login URL: $loginUrl")
             
