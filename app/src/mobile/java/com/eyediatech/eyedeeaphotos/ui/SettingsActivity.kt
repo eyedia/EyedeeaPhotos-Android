@@ -401,6 +401,7 @@ class SettingsActivity : AppCompatActivity() {
             .setConstraints(constraints)
             .addTag("SyncTag")
             .addTag("ManualSync")
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .build()
 
         WorkManager.getInstance(this).enqueueUniqueWork(

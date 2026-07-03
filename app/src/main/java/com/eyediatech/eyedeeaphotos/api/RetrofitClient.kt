@@ -32,6 +32,9 @@ object RetrofitClient {
             }
             
             okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(15, java.util.concurrent.TimeUnit.MINUTES)
                 .addInterceptor(userAgentInterceptor)
                 .addInterceptor(authInterceptor)
                 .addInterceptor(loggingInterceptor)
@@ -44,7 +47,12 @@ object RetrofitClient {
             if (apiService == null) {
                 apiService = Retrofit.Builder()
                     .baseUrl(BASE_URL)
-                    .client(okHttpClient ?: OkHttpClient.Builder().addInterceptor(loggingInterceptor).build())
+                    .client(okHttpClient ?: OkHttpClient.Builder()
+                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                        .writeTimeout(15, java.util.concurrent.TimeUnit.MINUTES)
+                        .addInterceptor(loggingInterceptor)
+                        .build())
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
                     .create(ApiService::class.java)

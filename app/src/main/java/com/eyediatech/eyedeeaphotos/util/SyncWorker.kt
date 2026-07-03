@@ -21,8 +21,40 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     private val authRepository = AuthRepository(context)
     private val photoRepository = PhotoRepository(AppDatabase.getDatabase(context).photoDao())
 
+    private suspend fun setupForegroundInfo() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "SyncChannel",
+                "Photo Sync",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = applicationContext.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+
+        val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, "SyncChannel")
+            .setContentTitle("Syncing Photos")
+            .setContentText("Uploading photos in the background")
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setOngoing(true)
+            .build()
+            
+        val foregroundInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            androidx.work.ForegroundInfo(2, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            androidx.work.ForegroundInfo(2, notification)
+        }
+        
+        try {
+            setForeground(foregroundInfo)
+        } catch (e: Exception) {
+            FileLogger.e("SyncWorker", "Failed to set foreground service", e)
+        }
+    }
+
     override suspend fun doWork(): Result {
         FileLogger.d("SyncWorker", "Sync starting...")
+        setupForegroundInfo()
         
         val token = authRepository.getToken() ?: return Result.failure()
         val authHeader = "Bearer $token"
@@ -71,7 +103,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
             // 2. Batch Upload Raw Photos
             if (rawPhotos.isNotEmpty()) {
-                val batchSize = 20
+                val batchSize = 1 // Reduced from 20 for extreme slow network reliability
                 val batches = rawPhotos.chunked(batchSize)
                 FileLogger.d("SyncWorker", "Starting upload of ${rawPhotos.size} raw photos in ${batches.size} batches")
                 
@@ -92,7 +124,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             if (curatedPhotos.isNotEmpty()) {
                 val byAlbum = curatedPhotos.groupBy { it.destinationAlbum!! }
                 for ((albumPath, albumPhotos) in byAlbum) {
-                    val batchSize = 20
+                    val batchSize = 1 // Reduced from 20 for extreme slow network reliability
                     val batches = albumPhotos.chunked(batchSize)
                     FileLogger.d("SyncWorker", "Starting upload of ${albumPhotos.size} curated photos to $albumPath")
                     
@@ -150,7 +182,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         // For raw, it is "raw"
         val folderPathStr = if (scanAfterUpload) "raw" else folderName
         val folderPath = folderPathStr.toRequestBody("text/plain".toMediaTypeOrNull())
-        val scanAfterUploadBody = scanAfterUpload.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+        // Always pass "false" to the API to prevent the server from running expensive scans 
+        // after every single file. We trigger the scan explicitly at the end of the batch!
+        val scanAfterUploadBody = "false".toRequestBody("text/plain".toMediaTypeOrNull())
         val authHeader = "Bearer $token"
 
         val response = RetrofitClient.instance.uploadPhotos(
