@@ -24,12 +24,13 @@ android {
     signingConfigs {
         create("release") {
             if (project.extra.has("keyAlias") && project.extra.has("keystorePassword") && project.extra.has("keyPassword")) {
-                storeFile = file("E:/Work/Eyedeea-Core/android/eyedeea_photos_v3.jks")
+                val keystorePath = if (project.extra.has("storeFile")) project.extra.get("storeFile") as String else "E:/Work/Eyedeea-Core/android/eyedeea_photos_v3.jks"
+                storeFile = file(keystorePath)
                 storePassword = project.extra.get("keystorePassword") as String
                 keyAlias = project.extra.get("keyAlias") as String
                 keyPassword = project.extra.get("keyPassword") as String
             } else {
-                // This block is left empty intentionally. The build will fail later with a clear message if signing is attempted without configuration.
+                // Not configured in local.properties. Handled below in buildTypes.
             }
         }
     }
@@ -79,7 +80,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (project.extra.has("keyAlias") && project.extra.has("keystorePassword") && project.extra.has("keyPassword")) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                println("WARNING: Building release without a signing config because keystore properties are missing in local.properties")
+            }
             buildConfigField("String", "BASE_URL", "\"https://www.eyedeeaphotos.com/\"")
             buildConfigField("String", "VIEW_URL", "\"https://www.eyedeeaphotos.com/view\"")
             buildConfigField("String", "LOGIN_URL", "\"https://www.eyedeeaphotos.com/app-login?device=android\"")

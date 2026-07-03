@@ -9,6 +9,7 @@ import com.eyediatech.eyedeeaphotos.data.AppDatabase
 import com.eyediatech.eyedeeaphotos.data.QueuedPhoto
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.repository.PhotoRepository
+import com.eyediatech.eyedeeaphotos.utils.FileLogger
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -21,7 +22,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     private val photoRepository = PhotoRepository(AppDatabase.getDatabase(context).photoDao())
 
     override suspend fun doWork(): Result {
-        Log.d("SyncWorker", "Sync starting...")
+        FileLogger.d("SyncWorker", "Sync starting...")
         
         val token = authRepository.getToken() ?: return Result.failure()
         val authHeader = "Bearer $token"
@@ -39,7 +40,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
         val photosToUpload = photoRepository.getPhotosToUpload()
         if (photosToUpload.isEmpty()) {
-            Log.d("SyncWorker", "No photos to upload")
+            FileLogger.d("SyncWorker", "No photos to upload")
             return Result.success()
         }
 
@@ -48,16 +49,16 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             photoRepository.resetUploadingStatus()
 
             // 1. Quota Check
-            Log.d("SyncWorker", "Checking quota for Household: $householdId, Source: $sourceId")
+            FileLogger.d("SyncWorker", "Checking quota for Household: $householdId, Source: $sourceId")
             val quotaResponse = RetrofitClient.instance.getQuotaSummary(authHeader, householdId, sourceId!!)
             
             if (!quotaResponse.isSuccessful) {
-                Log.e("SyncWorker", "Quota check failed: ${quotaResponse.code()} - ${quotaResponse.errorBody()?.string()}")
+                FileLogger.e("SyncWorker", "Quota check failed: ${quotaResponse.code()} - ${quotaResponse.errorBody()?.string()}")
                 return Result.retry()
             }
             
             if (quotaResponse.body()?.data?.hasQuota == false) {
-                Log.w("SyncWorker", "No quota available for upload")
+                FileLogger.w("SyncWorker", "No quota available for upload")
                 return Result.success()
             }
 
@@ -72,19 +73,19 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             if (rawPhotos.isNotEmpty()) {
                 val batchSize = 20
                 val batches = rawPhotos.chunked(batchSize)
-                Log.d("SyncWorker", "Starting upload of ${rawPhotos.size} raw photos in ${batches.size} batches")
+                FileLogger.d("SyncWorker", "Starting upload of ${rawPhotos.size} raw photos in ${batches.size} batches")
                 
                 for ((index, batch) in batches.withIndex()) {
-                    Log.d("SyncWorker", "Uploading raw batch ${index + 1}/${batches.size}")
+                    FileLogger.d("SyncWorker", "Uploading raw batch ${index + 1}/${batches.size}")
                     uploadBatch(batch, token, householdId, sourceId, folderName, scanAfterUpload = true)
                 }
 
                 // 3. Explicit Scan Trigger for Raw
-                Log.d("SyncWorker", "Triggering scan for raw processing...")
+                FileLogger.d("SyncWorker", "Triggering scan for raw processing...")
                 val scanResponse = RetrofitClient.instance.triggerScan(
                     "Bearer $token", householdId, sourceId, "raw", "background", 4
                 )
-                Log.d("SyncWorker", "Scan trigger result: ${scanResponse.code()}")
+                FileLogger.d("SyncWorker", "Scan trigger result: ${scanResponse.code()}")
             }
 
             // 4. Batch Upload Curated Photos
@@ -93,11 +94,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 for ((albumPath, albumPhotos) in byAlbum) {
                     val batchSize = 20
                     val batches = albumPhotos.chunked(batchSize)
-                    Log.d("SyncWorker", "Starting upload of ${albumPhotos.size} curated photos to $albumPath")
+                    FileLogger.d("SyncWorker", "Starting upload of ${albumPhotos.size} curated photos to $albumPath")
                     
                     val allUploadedFiles = mutableListOf<com.eyediatech.eyedeeaphotos.data.UploadedFile>()
                     for ((index, batch) in batches.withIndex()) {
-                        Log.d("SyncWorker", "Uploading curated batch ${index + 1}/${batches.size} to $albumPath")
+                        FileLogger.d("SyncWorker", "Uploading curated batch ${index + 1}/${batches.size} to $albumPath")
                         val uploadedFiles = uploadBatch(batch, token, householdId, sourceId, albumPath, scanAfterUpload = false)
                         allUploadedFiles.addAll(uploadedFiles)
                     }
@@ -110,7 +111,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
             return Result.success()
         } catch (e: Exception) {
-            Log.e("SyncWorker", "Sync exception occurred", e)
+            FileLogger.e("SyncWorker", "Sync exception occurred", e)
             return Result.retry()
         }
     }
@@ -129,7 +130,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         for (photo in batch) {
             val file = File(photo.internalPath)
             if (file.exists()) {
-                Log.d("SyncWorker", "Adding to batch: ${file.name}")
+                FileLogger.d("SyncWorker", "Adding to batch: ${file.name}")
                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                 photosParts.add(MultipartBody.Part.createFormData("photos", file.name, requestFile))
                 
@@ -156,10 +157,10 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             authHeader, householdId, sourceId, folderPath, scanAfterUploadBody, photosParts, relativePathsParts.toTypedArray()
         )
 
-        Log.d("SyncWorker", "Upload API response code: ${response.code()}")
+        FileLogger.d("SyncWorker", "Upload API response code: ${response.code()}")
 
         if (response.isSuccessful) {
-            Log.d("SyncWorker", "Batch upload successful. Cleaning up files.")
+            FileLogger.d("SyncWorker", "Batch upload successful. Cleaning up files.")
             for (photo in batch) {
                 val file = File(photo.internalPath)
                 if (file.exists()) file.delete()
@@ -168,7 +169,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             return response.body()?.uploaded ?: emptyList()
         } else {
             val errorMsg = response.errorBody()?.string() ?: "Unknown error"
-            Log.e("SyncWorker", "Batch upload failed: $errorMsg")
+            FileLogger.e("SyncWorker", "Batch upload failed: $errorMsg")
             for (photo in batch) {
                 photoRepository.updateStatus(photo.id, "FAILED")
             }
@@ -254,9 +255,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             "Bearer $token", householdId, sourceId, request
         )
 
-        Log.d("SyncWorker", "Trigger curated analysis response code: ${response.code()}")
+        FileLogger.d("SyncWorker", "Trigger curated analysis response code: ${response.code()}")
         if (!response.isSuccessful) {
-            Log.e("SyncWorker", "Trigger curated analysis failed: ${response.errorBody()?.string()}")
+            FileLogger.e("SyncWorker", "Trigger curated analysis failed: ${response.errorBody()?.string()}")
         }
     }
 }

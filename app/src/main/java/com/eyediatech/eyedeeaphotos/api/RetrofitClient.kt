@@ -12,7 +12,7 @@ object RetrofitClient {
     val BASE_URL = BuildConfig.BASE_URL
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = HttpLoggingInterceptor.Level.HEADERS // Changed from BODY to HEADERS to prevent OOM/stalling on large multipart uploads
     }
 
     private var okHttpClient: OkHttpClient? = null

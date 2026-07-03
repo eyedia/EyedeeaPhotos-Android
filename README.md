@@ -11,17 +11,14 @@ You can open this folder (the Android project) directly in Android Studio and ru
 
 1. Update `local.properties` with any required secrets/passwords used by your build tasks.
 2. From this folder (D:\Work\EyedeeaPhotos\apps\android), run the following commands:
-
-```
-./gradlew app:assembleFiretvRelease
-./gradlew app:assembleMobileRelease
-```
-
+   ```
+   ./gradlew app:assembleFiretvRelease
+   ./gradlew app:assembleMobileRelease
+   ```
 3. To rename and copy the generated APKs to the top-level `/release` folder, run:
-
-```
-./gradlew buildAndCopyApks
-```
+   ```
+   ./gradlew buildAndCopyApks
+   ```
 
 Notes:
 - These commands assume a Unix-like shell; on Windows you may prefer `gradlew.bat` equivalents.

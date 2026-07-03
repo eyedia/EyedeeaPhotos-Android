@@ -137,6 +137,37 @@ class SettingsActivity : AppCompatActivity() {
                 triggerManualSync()
             }
         }
+
+        binding.exportLogsButton.setOnClickListener {
+            exportLogs()
+        }
+    }
+
+    private fun exportLogs() {
+        val logFile = com.eyediatech.eyedeeaphotos.utils.FileLogger.getLogFile(this)
+        if (!logFile.exists() || logFile.length() == 0L) {
+            Toast.makeText(this, "No logs available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                logFile
+            )
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Eyedeea Photos Debug Logs")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Send Logs"))
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsActivity", "Failed to export logs", e)
+            Toast.makeText(this, "Failed to export logs", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun cancelSync() {
