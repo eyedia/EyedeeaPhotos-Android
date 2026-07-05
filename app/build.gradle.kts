@@ -68,8 +68,8 @@ android {
         applicationId = "com.eyediatech.eyedeeaphotos"
         minSdk = 21
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.8"
+        versionCode = 10
+        versionName = "1.9"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -94,10 +94,10 @@ android {
         getByName("debug") {
             isDebuggable = true
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "BASE_URL", "\"https://www.eyedeeaphotos.com/\"")
-            buildConfigField("String", "VIEW_URL", "\"https://www.eyedeeaphotos.com/view\"")
-            buildConfigField("String", "LOGIN_URL", "\"https://www.eyedeeaphotos.com/app-login?device=android\"")
-            buildConfigField("String", "VERIFICATION_URL", "\"https://www.eyedeeaphotos.com/auth/device\"")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100:5174/\"")
+            buildConfigField("String", "VIEW_URL", "\"http://192.168.86.100:5174/view\"")
+            buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.100:5174/app-login?device=android\"")
+            buildConfigField("String", "VERIFICATION_URL", "\"http://192.168.86.100:5174/auth/device\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "true")
         }
     }
