@@ -29,7 +29,7 @@
     <string name="login_error_incomplete_account">This account does not have an active subscription or complete profile. Please log in with the correct account.</string>
     <string name="login_error_generic">Authentication failed. Please try again with the correct account.</string>
     <string name="ok">OK</string>
-    <string name="login_instruction">Open your Eyedeea Photos mobile app to enter the code:</string>
+    <string name="login_instruction">Go to\n%1$s\nand enter the code:</string>
     <string name="user_code_placeholder">----</string>
     <string name="login_failure_message">Failed to get code. Please try again later.</string>
     <string name="login_no_activity_message">It looks like no one entered the code.\nTap Refresh to try again.</string>

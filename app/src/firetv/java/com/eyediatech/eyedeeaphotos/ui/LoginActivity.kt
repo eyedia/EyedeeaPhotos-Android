@@ -82,6 +82,10 @@ class LoginActivity : FragmentActivity() {
                     // val qrBitmap = QRGenerator.generateQRCode(qrUrl, 600)
                     // binding.qrImageView.setImageBitmap(qrBitmap)
                     
+                    val baseUrl = BuildConfig.BASE_URL
+                    val displayUrl = baseUrl.replace(Regex("^https?://(www\\.)?"), "").removeSuffix("/") + "/activate"
+                    binding.instructionTextView.text = getString(com.eyediatech.eyedeeaphotos.R.string.login_instruction, displayUrl)
+                    
                     binding.userCodeTextView.text = deviceData.userCode
                     
                     binding.loadingProgressBar.visibility = View.GONE

@@ -68,7 +68,28 @@ class MainActivity : AppCompatActivity() {
         pickImagesLauncher.launch("image/*")
     }
 
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // Whether they grant or deny it, we still proceed to pick images.
+        // If denied, they just won't see the sync notification.
+        checkLocationPermissionAndPickImages()
+    }
+
     private var pendingDestinationAlbum: String? = null
+
+    private fun checkNotificationPermissionAndProceed() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            checkLocationPermissionAndPickImages()
+        }
+    }
 
     private fun checkLocationPermissionAndPickImages() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -393,20 +414,20 @@ class MainActivity : AppCompatActivity() {
                     view.findViewById<View>(R.id.optionCurrentAlbum).setOnClickListener {
                         pendingDestinationAlbum = albumPath
                         bottomSheetDialog.dismiss()
-                        checkLocationPermissionAndPickImages()
+                        checkNotificationPermissionAndProceed()
                     }
                     
                     view.findViewById<View>(R.id.optionRawCurate).setOnClickListener {
                         pendingDestinationAlbum = null
                         bottomSheetDialog.dismiss()
-                        checkLocationPermissionAndPickImages()
+                        checkNotificationPermissionAndProceed()
                     }
                     
                     bottomSheetDialog.setContentView(view)
                     bottomSheetDialog.show()
                 } else {
                     pendingDestinationAlbum = null
-                    checkLocationPermissionAndPickImages()
+                    checkNotificationPermissionAndProceed()
                 }
             }
             
