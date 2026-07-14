@@ -111,7 +111,20 @@ class OfflineSyncWorker(
             (0 until arr.length()).map { arr.getString(it) }.toSet()
         } catch (e: Exception) { emptySet<String>() }
 
+        val allSubscriptions = dao.getActiveSubscriptions()
+        val globallySyncedIds = mutableSetOf<String>()
+        for (s in allSubscriptions) {
+            try {
+                val arr = org.json.JSONArray(s.lastSyncedPhotoIds)
+                for (i in 0 until arr.length()) {
+                    globallySyncedIds.add(arr.getString(i))
+                }
+            } catch (e: Exception) {}
+        }
+
         val newPhotos = mutableListOf<ZipPhotoEntry>()
+
+        val newlySyncedIds = mutableListOf<String>()
 
         if (sub.type == "album") {
             val photosArray = json.optJSONArray("photos") ?: return
@@ -120,12 +133,18 @@ class OfflineSyncWorker(
                 val p = photosArray.getJSONObject(i)
                 val photoId = p.optString("photo_id")
                 if (photoId.isNotEmpty() && !lastSyncedIds.contains(photoId)) {
-                    newPhotos.add(ZipPhotoEntry(
-                        photo_id = photoId,
-                        source_id = p.optLong("source_id"),
-                        filename = p.optString("name", p.optString("filename", "$photoId.jpg")),
-                        folder_name = sub.folderPath ?: ""
-                    ))
+                    if (globallySyncedIds.contains(photoId)) {
+                        newlySyncedIds.add(photoId)
+                    } else {
+                        val pFolderName = p.optString("folder_name", "")
+                        val resolvedFolder = if (pFolderName.isNotBlank()) pFolderName else (sub.folderPath ?: "")
+                        newPhotos.add(ZipPhotoEntry(
+                            photo_id = photoId,
+                            source_id = p.optLong("source_id"),
+                            filename = p.optString("name", p.optString("filename", "$photoId.jpg")),
+                            folder_name = resolvedFolder
+                        ))
+                    }
                 }
             }
         } else {
@@ -135,24 +154,26 @@ class OfflineSyncWorker(
                 val p = dataArray.getJSONObject(i)
                 val photoId = p.optString("photo_id")
                 if (photoId.isNotEmpty() && !lastSyncedIds.contains(photoId)) {
-                    newPhotos.add(ZipPhotoEntry(
-                        photo_id = photoId,
-                        source_id = p.optLong("source_id"),
-                        filename = p.optString("filename", "$photoId.jpg"),
-                        folder_name = p.optString("folder_name", "")
-                    ))
+                    if (globallySyncedIds.contains(photoId)) {
+                        newlySyncedIds.add(photoId)
+                    } else {
+                        newPhotos.add(ZipPhotoEntry(
+                            photo_id = photoId,
+                            source_id = p.optLong("source_id"),
+                            filename = p.optString("filename", "$photoId.jpg"),
+                            folder_name = p.optString("folder_name", "")
+                        ))
+                    }
                 }
             }
         }
 
-        if (newPhotos.isEmpty()) {
+        if (newPhotos.isEmpty() && newlySyncedIds.isEmpty()) {
             Log.d(TAG, "No new photos to sync for subscription: ${sub.id}")
             return
         }
         
         Log.d(TAG, "Syncing ${newPhotos.size} new photos")
-
-        val newlySyncedIds = mutableListOf<String>()
 
         if (newPhotos.size <= 5) {
             // direct download

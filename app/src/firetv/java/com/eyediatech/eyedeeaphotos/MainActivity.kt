@@ -18,11 +18,15 @@ class MainActivity : FragmentActivity() {
     private lateinit var authRepository: AuthRepository
     private var tokenInjectionCount = 0
     private var isAtViewPage = false
+    private var isInfoOpen = false
 
     private fun updateKeepAwake(url: String?) {
         val isAtView = url?.contains("/view", ignoreCase = true) == true
         if (isAtView == isAtViewPage) return
         isAtViewPage = isAtView
+        if (!isAtView) {
+            isInfoOpen = false
+        }
         if (isAtView) {
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
@@ -46,12 +50,28 @@ class MainActivity : FragmentActivity() {
         setupWebView()
     }
 
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
-            startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
-            return true
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: android.view.KeyEvent?): Boolean {
+        if (event?.action == android.view.KeyEvent.ACTION_DOWN) {
+            val keyCode = event.keyCode
+            if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
+                startActivity(Intent(this, com.eyediatech.eyedeeaphotos.ui.SettingsActivity::class.java))
+                return true
+            }
+            if (isAtViewPage && event.repeatCount == 0) {
+                if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                    isInfoOpen = !isInfoOpen
+                    binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'toggle_info' } }));", null)
+                    return true
+                }
+                if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInfoOpen) {
+                    isInfoOpen = false
+                    binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'close_info' } }));", null)
+                    return true
+                }
+            }
         }
-        return super.onKeyDown(keyCode, event)
+        return super.dispatchKeyEvent(event)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -114,6 +134,18 @@ class MainActivity : FragmentActivity() {
             @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.LOLLIPOP)
             override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
                 val uri = request?.url
+                if (uri?.scheme == "eyedeea" && uri.host == "view") {
+                    val action = uri.getQueryParameter("action")
+                    if (action == "toggle_info") {
+                        isInfoOpen = !isInfoOpen
+                        view?.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'toggle_info' } }));", null)
+                        return true
+                    } else if (action == "close_info") {
+                        isInfoOpen = false
+                        view?.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'close_info' } }));", null)
+                        return true
+                    }
+                }
                 if (uri != null && authRepository.isAuthenticated()) {
                     val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
                     if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
@@ -133,19 +165,33 @@ class MainActivity : FragmentActivity() {
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                if (url != null && authRepository.isAuthenticated()) {
+                if (url != null) {
                     try {
                         val uri = android.net.Uri.parse(url)
-                        val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
-                        if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
-                            val path = uri.path ?: ""
-                            if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
-                                Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
-                                view?.visibility = android.view.View.INVISIBLE
-                                view?.post {
-                                    injectTokenIntoLocalStorage(view)
-                                }
+                        if (uri.scheme == "eyedeea" && uri.host == "view") {
+                            val action = uri.getQueryParameter("action")
+                            if (action == "toggle_info") {
+                                isInfoOpen = !isInfoOpen
+                                view?.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'toggle_info' } }));", null)
                                 return true
+                            } else if (action == "close_info") {
+                                isInfoOpen = false
+                                view?.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'close_info' } }));", null)
+                                return true
+                            }
+                        }
+                        if (authRepository.isAuthenticated()) {
+                            val baseUrlUri = android.net.Uri.parse(BuildConfig.BASE_URL)
+                            if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
+                                val path = uri.path ?: ""
+                                if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                                    Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
+                                    view?.visibility = android.view.View.INVISIBLE
+                                    view?.post {
+                                        injectTokenIntoLocalStorage(view)
+                                    }
+                                    return true
+                                }
                             }
                         }
                     } catch (e: Exception) {
