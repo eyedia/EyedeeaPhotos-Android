@@ -48,7 +48,53 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         try {
             setForeground(foregroundInfo)
         } catch (e: Exception) {
-            FileLogger.e("SyncWorker", "Failed to set foreground service", e)
+            FileLogger.e("SyncWorker", "Failed to set foreground", e)
+        }
+    }
+
+    private fun ensureUserNotifyChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "UploadStatusChannel",
+                "Upload Status",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            )
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun notifyUserVisibleFailure(title: String, message: String) {
+        try {
+            ensureUserNotifyChannel()
+            val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, "UploadStatusChannel")
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setAutoCancel(true)
+                .build()
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.notify(3011, notification)
+        } catch (e: Exception) {
+            FileLogger.e("SyncWorker", "Failed to show failure notification", e)
+        }
+    }
+
+    private fun notifyUserVisibleSuccess(title: String, message: String) {
+        try {
+            ensureUserNotifyChannel()
+            val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, "UploadStatusChannel")
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                .setAutoCancel(true)
+                .build()
+            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.notify(3012, notification)
+        } catch (e: Exception) {
+            FileLogger.e("SyncWorker", "Failed to show success notification", e)
         }
     }
 
@@ -118,6 +164,19 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                     "Bearer $token", householdId, sourceId, "raw", "background", 4
                 )
                 FileLogger.d("SyncWorker", "Scan trigger result: ${scanResponse.code()}")
+                if (!scanResponse.isSuccessful) {
+                    val errorBody = scanResponse.errorBody()?.string().orEmpty()
+                    FileLogger.e("SyncWorker", "Scan trigger failed: ${scanResponse.code()} $errorBody")
+                    notifyUserVisibleFailure(
+                        title = "Could not organize photos",
+                        message = "Your photos uploaded, but we couldn't start organizing them. Open Upload and tap Auto Curate, or try Sync again later."
+                    )
+                } else {
+                    notifyUserVisibleSuccess(
+                        title = "Photos uploaded",
+                        message = "Uploaded ${rawPhotos.size} photo(s). Organizing them in the background."
+                    )
+                }
             }
 
             // 4. Batch Upload Curated Photos
@@ -161,7 +220,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
         for (photo in batch) {
             val file = File(photo.internalPath)
-            if (file.exists()) {
+            if (file.exists() && file.length() > 0L) {
                 FileLogger.d("SyncWorker", "Adding to batch: ${file.name}")
                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                 photosParts.add(MultipartBody.Part.createFormData("photos", file.name, requestFile))
@@ -172,6 +231,10 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 
                 photoRepository.updateStatus(photo.id, "UPLOADING")
             } else {
+                if (file.exists()) {
+                    FileLogger.w("SyncWorker", "Skipping empty file: ${file.name}")
+                    file.delete()
+                }
                 photoRepository.delete(photo)
             }
         }

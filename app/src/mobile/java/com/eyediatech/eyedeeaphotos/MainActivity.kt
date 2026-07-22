@@ -62,6 +62,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Pending WebView HTML file-input callback (in-page Choose Files). */
+    private var webViewFilePathCallback: ValueCallback<Array<Uri>>? = null
+
+    private val webViewFileChooserLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        val callback = webViewFilePathCallback
+        webViewFilePathCallback = null
+        if (uris.isNullOrEmpty()) {
+            callback?.onReceiveValue(null)
+        } else {
+            callback?.onReceiveValue(uris.toTypedArray())
+        }
+    }
+
     private val requestLocationPermissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { _ ->
@@ -91,6 +106,66 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Opens native gallery picker. albumPath null => raw upload; non-null curated album path.
+     * When albumPath is a deep curated album and showChoice is true, show destination bottom sheet.
+     */
+    private fun startNativeUpload(albumPath: String? = null, showCuratedChoice: Boolean = false) {
+        runOnUiThread {
+            if (showCuratedChoice && !albumPath.isNullOrBlank() && albumPath.startsWith("curated/")) {
+                val parts = albumPath.split("/")
+                if (parts.size >= 4) {
+                    val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+                    val view = layoutInflater.inflate(R.layout.bottom_sheet_upload_options, null)
+
+                    view.findViewById<View>(R.id.optionCurrentAlbum).setOnClickListener {
+                        pendingDestinationAlbum = albumPath
+                        bottomSheetDialog.dismiss()
+                        checkNotificationPermissionAndProceed()
+                    }
+
+                    view.findViewById<View>(R.id.optionRawCurate).setOnClickListener {
+                        pendingDestinationAlbum = null
+                        bottomSheetDialog.dismiss()
+                        checkNotificationPermissionAndProceed()
+                    }
+
+                    bottomSheetDialog.setContentView(view)
+                    bottomSheetDialog.show()
+                    return@runOnUiThread
+                }
+            }
+
+            pendingDestinationAlbum = albumPath?.takeIf { it.isNotBlank() }
+            checkNotificationPermissionAndProceed()
+        }
+    }
+
+    private fun handleOpenNativeUploadPayload(jsonPayload: String?): Boolean {
+        return try {
+            val albumPath = if (jsonPayload.isNullOrBlank()) {
+                null
+            } else {
+                val json = org.json.JSONObject(jsonPayload)
+                json.optString("albumPath", "").ifBlank { null }
+            }
+            startNativeUpload(albumPath = albumPath, showCuratedChoice = !albumPath.isNullOrBlank())
+            true
+        } catch (e: Exception) {
+            Log.e("UPLOAD_DEBUG", "Failed to parse openNativeUpload payload", e)
+            startNativeUpload(albumPath = null, showCuratedChoice = false)
+            true
+        }
+    }
+
+    private fun handleUploadDeepLink(uri: Uri?) {
+        if (uri == null) return
+        if (uri.scheme != "eyedeea" || uri.host != "upload") return
+        val albumPath = uri.getQueryParameter("album")
+            ?: uri.getQueryParameter("albumPath")
+        startNativeUpload(albumPath = albumPath, showCuratedChoice = !albumPath.isNullOrBlank())
+    }
+
     private fun checkLocationPermissionAndPickImages() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(
@@ -108,11 +183,17 @@ class MainActivity : AppCompatActivity() {
         val destAlbum = pendingDestinationAlbum
         pendingDestinationAlbum = null
         lifecycleScope.launch {
-            Toast.makeText(this@MainActivity, "Your photos are queued and will sync soon.", Toast.LENGTH_LONG).show()
+            var queuedCount = 0
+            var emptySkippedCount = 0
             withContext(Dispatchers.IO) {
                 for (uri in uris) {
                     val internalFile = copyToInternalStorage(uri)
                     if (internalFile != null) {
+                        if (internalFile.length() <= 0L) {
+                            internalFile.delete()
+                            emptySkippedCount += 1
+                            continue
+                        }
                         val queuedPhoto = com.eyediatech.eyedeeaphotos.data.QueuedPhoto(
                             fileUri = uri.toString(),
                             internalPath = internalFile.absolutePath,
@@ -120,9 +201,21 @@ class MainActivity : AppCompatActivity() {
                             destinationAlbum = destAlbum
                         )
                         photoRepository.insert(queuedPhoto)
+                        queuedCount += 1
                     }
                 }
             }
+            val message = when {
+                queuedCount > 0 && emptySkippedCount > 0 ->
+                    "$queuedCount photo(s) queued. $emptySkippedCount empty photo(s) were skipped."
+                queuedCount > 0 ->
+                    "Your photos are queued and will sync soon."
+                emptySkippedCount > 0 ->
+                    "$emptySkippedCount photo(s) were empty and were not uploaded."
+                else ->
+                    "No photos could be queued. Please try again."
+            }
+            Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -171,6 +264,11 @@ class MainActivity : AppCompatActivity() {
                 finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
+            } ?: return@withContext null
+
+            if (finalFile.length() <= 0L) {
+                finalFile.delete()
+                return@withContext null
             }
             finalFile
         } catch (_: Exception) {
@@ -239,6 +337,14 @@ class MainActivity : AppCompatActivity() {
                 handleLoadError()
             }
         }
+
+        handleUploadDeepLink(intent?.data)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleUploadDeepLink(intent?.data)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -261,6 +367,7 @@ class MainActivity : AppCompatActivity() {
             val refreshInterval = refreshIntervalMinutes.toLong() * 60000
             handler.postDelayed(runnable, refreshInterval)
         }
+        webView.onResume()
     }
 
     override fun onPause() {
@@ -268,6 +375,7 @@ class MainActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, KeepAwakeService::class.java) 
         stopService(serviceIntent) 
         handler.removeCallbacks(runnable)
+        webView.onPause()
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -336,6 +444,7 @@ class MainActivity : AppCompatActivity() {
         val webSettings = webView.settings
         webSettings.javaScriptEnabled = true
         webSettings.domStorageEnabled = true
+        webSettings.databaseEnabled = true
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
         webSettings.mediaPlaybackRequiresUserGesture = false
@@ -343,7 +452,7 @@ class MainActivity : AppCompatActivity() {
         // Enable downloads
         webSettings.setSupportMultipleWindows(true)
         webSettings.javaScriptCanOpenWindowsAutomatically = true
-        webSettings.cacheMode = WebSettings.LOAD_NO_CACHE
+        webSettings.cacheMode = WebSettings.LOAD_DEFAULT
 
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
@@ -353,10 +462,13 @@ class MainActivity : AppCompatActivity() {
         // Enable maximum performance
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
-        // Setup JS Bridge for Offline Sync
+        // Setup JS Bridge for Offline Sync + Native Upload
         val syncCoordinator = com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator(this)
         webView.addJavascriptInterface(
-            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(syncCoordinator),
+            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(
+                syncCoordinator,
+                onOpenNativeUpload = { payload -> handleOpenNativeUploadPayload(payload) }
+            ),
             "EyedeeaPhotosNativeBridge"
         )
 
@@ -386,8 +498,7 @@ class MainActivity : AppCompatActivity() {
                 toggleMenu()
                 
                 val currentUrl = webView.url
-                var isCuratedAlbum = false
-                var albumPath = ""
+                var albumPath: String? = null
                 
                 if (currentUrl != null && currentUrl.contains("tab=browse")) {
                     val uri = try { Uri.parse(currentUrl) } catch (e: Exception) { null }
@@ -400,35 +511,13 @@ class MainActivity : AppCompatActivity() {
                             val parts = path.split("/")
                             // Example: curated/2021-2025/2025/Weekend Trip -> 4 parts
                             if (parts.size >= 4) {
-                                isCuratedAlbum = true
                                 albumPath = path
                             }
                         }
                     }
                 }
                 
-                if (isCuratedAlbum) {
-                    val bottomSheetDialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
-                    val view = layoutInflater.inflate(R.layout.bottom_sheet_upload_options, null)
-                    
-                    view.findViewById<View>(R.id.optionCurrentAlbum).setOnClickListener {
-                        pendingDestinationAlbum = albumPath
-                        bottomSheetDialog.dismiss()
-                        checkNotificationPermissionAndProceed()
-                    }
-                    
-                    view.findViewById<View>(R.id.optionRawCurate).setOnClickListener {
-                        pendingDestinationAlbum = null
-                        bottomSheetDialog.dismiss()
-                        checkNotificationPermissionAndProceed()
-                    }
-                    
-                    bottomSheetDialog.setContentView(view)
-                    bottomSheetDialog.show()
-                } else {
-                    pendingDestinationAlbum = null
-                    checkNotificationPermissionAndProceed()
-                }
+                startNativeUpload(albumPath = albumPath, showCuratedChoice = albumPath != null)
             }
             
             settingsActionIcon?.setOnClickListener {
@@ -500,6 +589,10 @@ class MainActivity : AppCompatActivity() {
             @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val uri = request?.url
+                if (uri != null && uri.scheme == "eyedeea" && uri.host == "upload") {
+                    handleUploadDeepLink(uri)
+                    return true
+                }
                 if (uri != null && authRepository.isAuthenticated()) {
                     val baseUrlUri = Uri.parse(BuildConfig.BASE_URL)
                     if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
@@ -519,6 +612,17 @@ class MainActivity : AppCompatActivity() {
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url != null) {
+                    try {
+                        val deepLinkUri = Uri.parse(url)
+                        if (deepLinkUri.scheme == "eyedeea" && deepLinkUri.host == "upload") {
+                            handleUploadDeepLink(deepLinkUri)
+                            return true
+                        }
+                    } catch (_: Exception) {
+                        // Continue with auth intercept below.
+                    }
+                }
                 if (url != null && authRepository.isAuthenticated()) {
                     try {
                         val uri = Uri.parse(url)
@@ -600,7 +704,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // WebChromeClient for better JavaScript support and logging
+        // WebChromeClient for JS console + HTML <input type="file"> (Choose Files in upload modal)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                 if (BuildConfig.ENABLE_WEB_CONSOLE_LOG) {
@@ -609,6 +713,33 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 return true
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                // Supersede any previous pending chooser
+                webViewFilePathCallback?.onReceiveValue(null)
+                webViewFilePathCallback = filePathCallback
+
+                val acceptTypes = fileChooserParams?.acceptTypes
+                val mimeType = when {
+                    acceptTypes.isNullOrEmpty() || acceptTypes.all { it.isNullOrBlank() } -> "image/*"
+                    acceptTypes.any { it.contains("image", ignoreCase = true) } -> "image/*"
+                    else -> acceptTypes.firstOrNull { !it.isNullOrBlank() } ?: "*/*"
+                }
+
+                return try {
+                    webViewFileChooserLauncher.launch(mimeType)
+                    true
+                } catch (e: Exception) {
+                    Log.e("WEBVIEW_FILE", "Failed to launch file chooser", e)
+                    webViewFilePathCallback = null
+                    filePathCallback?.onReceiveValue(null)
+                    false
+                }
             }
         }
 
@@ -810,5 +941,15 @@ class MainActivity : AppCompatActivity() {
             sharedPreferences.edit { putBoolean(SERVER_DOWN, true) }
             webView.loadUrl("file:///android_asset/error.html")
         }
+    }
+
+    private fun clearWebViewFileChooser() {
+        webViewFilePathCallback?.onReceiveValue(null)
+        webViewFilePathCallback = null
+    }
+
+    override fun onDestroy() {
+        clearWebViewFileChooser()
+        super.onDestroy()
     }
 }

@@ -414,20 +414,38 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun queuePhotos(uris: List<Uri>) {
         lifecycleScope.launch {
-            Toast.makeText(this@SettingsActivity, getString(R.string.adding_photos, uris.size), Toast.LENGTH_SHORT).show()
+            var queuedCount = 0
+            var emptySkippedCount = 0
             withContext(Dispatchers.IO) {
                 for (uri in uris) {
                     val internalFile = copyToInternalStorage(uri)
                     if (internalFile != null) {
+                        if (internalFile.length() <= 0L) {
+                            internalFile.delete()
+                            emptySkippedCount += 1
+                            continue
+                        }
                         val queuedPhoto = QueuedPhoto(
                             fileUri = uri.toString(),
                             internalPath = internalFile.absolutePath,
                             fileName = internalFile.name
                         )
                         photoRepository.insert(queuedPhoto)
+                        queuedCount += 1
                     }
                 }
             }
+            val message = when {
+                queuedCount > 0 && emptySkippedCount > 0 ->
+                    "$queuedCount photo(s) queued. $emptySkippedCount empty photo(s) were skipped."
+                queuedCount > 0 ->
+                    getString(R.string.adding_photos, queuedCount)
+                emptySkippedCount > 0 ->
+                    "$emptySkippedCount photo(s) were empty and were not uploaded."
+                else ->
+                    "No photos could be queued. Please try again."
+            }
+            Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -480,6 +498,11 @@ class SettingsActivity : AppCompatActivity() {
                 finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
+            } ?: return@withContext null
+
+            if (finalFile.length() <= 0L) {
+                finalFile.delete()
+                return@withContext null
             }
             finalFile
         } catch (_: Exception) {

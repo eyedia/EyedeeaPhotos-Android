@@ -23,7 +23,10 @@ class KeepAwakeService : Service() {
     override fun onCreate() {
         super.onCreate()
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, WAKE_LOCK_TAG)
+        // SCREEN_BRIGHT_WAKE_LOCK forces maximum brightness and causes device heating/throttling.
+        // Changing to SCREEN_DIM_WAKE_LOCK to prevent the device from becoming super slow.
+        @Suppress("DEPRECATION")
+        wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE, WAKE_LOCK_TAG)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

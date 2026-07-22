@@ -185,15 +185,23 @@ class ShareActivity : AppCompatActivity() {
             
             // ... (rest of the method is the same)
             var count = 0
+            var queuedCount = 0
+            var emptySkippedCount = 0
             for (uri in uris) {
                 val internalFile = copyToInternalStorage(uri)
                 if (internalFile != null) {
-                    val queuedPhoto = QueuedPhoto(
-                        fileUri = uri.toString(),
-                        internalPath = internalFile.absolutePath,
-                        fileName = internalFile.name
-                    )
-                    photoRepository.insert(queuedPhoto)
+                    if (internalFile.length() <= 0L) {
+                        internalFile.delete()
+                        emptySkippedCount += 1
+                    } else {
+                        val queuedPhoto = QueuedPhoto(
+                            fileUri = uri.toString(),
+                            internalPath = internalFile.absolutePath,
+                            fileName = internalFile.name
+                        )
+                        photoRepository.insert(queuedPhoto)
+                        queuedCount += 1
+                    }
                 }
                 count++
                 binding.uploadProgressBar.progress = count
@@ -201,7 +209,17 @@ class ShareActivity : AppCompatActivity() {
             }
 
             Log.d(TAG, "queuePhotos: Queueing complete. Showing toast and finishing activity.")
-            Toast.makeText(this@ShareActivity, R.string.photos_added_to_queue, Toast.LENGTH_SHORT).show()
+            val toastMessage = when {
+                queuedCount > 0 && emptySkippedCount > 0 ->
+                    "$queuedCount photo(s) queued. $emptySkippedCount empty photo(s) were skipped."
+                queuedCount > 0 ->
+                    applicationContext.getString(R.string.photos_added_to_queue)
+                emptySkippedCount > 0 ->
+                    "$emptySkippedCount photo(s) were empty and were not uploaded."
+                else ->
+                    applicationContext.getString(R.string.photos_added_to_queue)
+            }
+            Toast.makeText(this@ShareActivity, toastMessage, Toast.LENGTH_SHORT).show()
             val intent = Intent(this@ShareActivity, SettingsActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
             startActivity(intent)
@@ -239,6 +257,11 @@ class ShareActivity : AppCompatActivity() {
                 finalFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
+            } ?: return@withContext null
+
+            if (finalFile.length() <= 0L) {
+                finalFile.delete()
+                return@withContext null
             }
             finalFile
         } catch (e: Exception) {
