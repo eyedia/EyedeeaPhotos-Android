@@ -35,8 +35,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.EyedeeaPhotos.Launcher"
-            tools:replace="android:theme"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|smallestScreenSize|density|layoutDirection|locale"
+            tools:replace="android:theme,android:configChanges">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
