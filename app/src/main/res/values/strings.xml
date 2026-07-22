@@ -2,7 +2,7 @@
     <string name="app_name">Eyedeea Photos</string>
     <string name="account_uploads">Account &amp; Uploads</string>
     <string name="settings">Settings</string>
-    <string name="version_info">Version: %1$s</string>
+    <string name="version_info">Version %1$s</string>
 
     <!-- Settings Screen -->
     <string name="visit_website">Visit Website</string>

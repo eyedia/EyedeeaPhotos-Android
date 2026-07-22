@@ -90,6 +90,13 @@ class SettingsActivity : AppCompatActivity() {
         authRepository = AuthRepository(this)
         photoRepository = PhotoRepository(AppDatabase.getDatabase(this).photoDao())
 
+        // Keep footer (version) above the system navigation bar / gesture inset.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, navBars.bottom)
+            insets
+        }
+
         setupUI()
         setupRecyclerView()
         observeData()

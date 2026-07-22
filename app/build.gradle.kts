@@ -19,7 +19,7 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.eyediatech.eyedeeaphotos"
-    compileSdk = 35
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -67,9 +67,9 @@ android {
     defaultConfig {
         applicationId = "com.eyediatech.eyedeeaphotos"
         minSdk = 21
-        targetSdk = 35
-        versionCode = 14
-        versionName = "1.13"
+        targetSdk = 36
+        versionCode = 15
+        versionName = "1.14"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -94,10 +94,10 @@ android {
         getByName("debug") {
             isDebuggable = true
             applicationIdSuffix = ".debug"
-            buildConfigField("String", "BASE_URL", "\"http://192.168.86.33:5174/\"")
-            buildConfigField("String", "VIEW_URL", "\"http://192.168.86.33:5174/view\"")
-            buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.33:5174/app-login?device=android\"")
-            buildConfigField("String", "VERIFICATION_URL", "\"http://192.168.86.33:5174/activate\"")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.86.100:5174/\"")
+            buildConfigField("String", "VIEW_URL", "\"http://192.168.86.100:5174/view\"")
+            buildConfigField("String", "LOGIN_URL", "\"http://192.168.86.100:5174/app-login?device=android\"")
+            buildConfigField("String", "VERIFICATION_URL", "\"http://192.168.86.100:5174/activate\"")
             buildConfigField("boolean", "ENABLE_WEB_CONSOLE_LOG", "true")
         }
     }
@@ -172,6 +172,9 @@ dependencies {
 
     // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
+
+    // Swipe Refresh
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

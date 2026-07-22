@@ -7,7 +7,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.EyedeeaPhotos.Launcher"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|smallestScreenSize|density|layoutDirection|locale"
             tools:replace="android:theme,android:configChanges">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

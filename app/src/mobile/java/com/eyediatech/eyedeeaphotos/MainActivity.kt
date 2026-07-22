@@ -3,6 +3,7 @@ package com.eyediatech.eyedeeaphotos
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ContentValues
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -10,8 +11,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
+import android.provider.MediaStore
+import android.util.Base64
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -23,6 +24,8 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -31,8 +34,12 @@ import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.repository.PhotoRepository
 import com.eyediatech.eyedeeaphotos.data.AppDatabase
 import com.eyediatech.eyedeeaphotos.ui.LoginActivity
+import com.eyediatech.eyedeeaphotos.ui.WebViewSwipeRefreshLayout
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -42,6 +49,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var swipeRefreshLayout: WebViewSwipeRefreshLayout
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var authRepository: AuthRepository
     private lateinit var photoRepository: PhotoRepository
@@ -285,8 +293,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PREFS_NAME = "EPPrefs"
         private const val WEBSITE_ADDRESS = "website_address"
+        private const val LAST_WEBVIEW_URL = "last_webview_url"
         private val WEBSITE_ADDRESS_DEFAULT = BuildConfig.VIEW_URL
-        private const val REFRESH_INTERVAL_KEY = "refresh_interval"
         const val SERVER_DOWN = "server_down"
     }
 
@@ -307,11 +315,38 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Get saved IP or use default
+        // Setup WebView
+        setupWebView()
+
+        // After a long lock Android often kills the process. restoreState() rarely freezes the
+        // SPA in place — it usually reloads from the network. Prefer the last real page the user
+        // was on (e.g. albums) so unlock doesn't bounce through login → /library.
+        val urlToLoad = resolveStartUrl()
+        try {
+            val restored = savedInstanceState != null && webView.restoreState(savedInstanceState) != null
+            if (restored && !webView.url.isNullOrBlank()) {
+                Log.d("WEBVIEW_DEBUG", "Restored WebView state; url=${webView.url}")
+            } else {
+                Log.d("WEBVIEW_DEBUG", "Loading: $urlToLoad (restored=$restored)")
+                webView.loadUrl(urlToLoad)
+            }
+        } catch (e: Exception) {
+            Log.e("WEBVIEW_DEBUG", "Load error: ${e.message}")
+            handleLoadError()
+        }
+
+        handleUploadDeepLink(intent?.data)
+    }
+
+    /** Default home for the role, or the last in-app URL if we have one. */
+    private fun resolveStartUrl(): String {
+        val lastUrl = sharedPreferences.getString(LAST_WEBVIEW_URL, null)
+        if (isPersistableAppUrl(lastUrl)) {
+            return lastUrl!!
+        }
         val savedIp = sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
-        
         val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-        val startUrl = if (authRepository.isAuthenticated()) {
+        return if (authRepository.isAuthenticated()) {
             val role = authRepository.getGroup() ?: "user"
             if (role == "user" || role == "auth_user" || role == "public_user") {
                 "$baseUrl/pricing"
@@ -321,24 +356,28 @@ class MainActivity : AppCompatActivity() {
         } else {
             savedIp
         }
+    }
 
-        // Setup WebView
-        setupWebView()
-
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-        } else {
-            // Load URL only if there is no saved state
-            try {
-                Log.d("WEBVIEW_DEBUG", "Loading: $startUrl")
-                webView.loadUrl(startUrl)
-            } catch (e: Exception) {
-                Log.e("WEBVIEW_DEBUG", "Load error: ${e.message}")
-                handleLoadError()
-            }
+    private fun isPersistableAppUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        if (url.startsWith("file://") || url == "about:blank") return false
+        return try {
+            val uri = Uri.parse(url)
+            val baseHost = Uri.parse(BuildConfig.BASE_URL).host
+            val hostOk = uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseHost
+            val path = uri.path ?: ""
+            val isAuthPage = path == "" || path == "/" ||
+                path.startsWith("/login") || path.startsWith("/app-login") ||
+                path.startsWith("/home") || path.startsWith("/auth")
+            hostOk && !isAuthPage
+        } catch (_: Exception) {
+            false
         }
+    }
 
-        handleUploadDeepLink(intent?.data)
+    private fun persistLastUrl(url: String?) {
+        if (!isPersistableAppUrl(url)) return
+        sharedPreferences.edit { putString(LAST_WEBVIEW_URL, url) }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -355,52 +394,22 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (isAtViewPage) {
-            val serviceIntent = Intent(this, KeepAwakeService::class.java) 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
-                startForegroundService(serviceIntent) 
-            } else { 
-                startService(serviceIntent) 
-            } 
+            val serviceIntent = Intent(this, KeepAwakeService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
         }
-        val refreshIntervalMinutes = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60)
-        if (refreshIntervalMinutes > 0) {
-            val refreshInterval = refreshIntervalMinutes.toLong() * 60000
-            handler.postDelayed(runnable, refreshInterval)
-        }
-        webView.onResume()
+        // Do not call webView.onResume() — it can make the web app refresh on unlock.
+        // Users refresh manually via pull-to-refresh.
     }
 
     override fun onPause() {
         super.onPause()
-        val serviceIntent = Intent(this, KeepAwakeService::class.java) 
-        stopService(serviceIntent) 
-        handler.removeCallbacks(runnable)
-        webView.onPause()
-    }
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val runnable = object : Runnable {
-        override fun run() {
-            val refreshIntervalMinutes = sharedPreferences.getInt(REFRESH_INTERVAL_KEY, 60)
-            if (refreshIntervalMinutes <= 0) return // Prevent infinite loop if interval is 0
-            
-            val refreshInterval = refreshIntervalMinutes.toLong() * 60000
-            val currentUrl = webView.url
-            if (currentUrl != null) {
-                if (currentUrl == "file:///android_asset/error.html") {
-                    val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
-                    val startUrl = if (authRepository.isAuthenticated()) {
-                        "$baseUrl/library"
-                    } else {
-                        sharedPreferences.getString(WEBSITE_ADDRESS, WEBSITE_ADDRESS_DEFAULT) ?: WEBSITE_ADDRESS_DEFAULT
-                    }
-                    webView.loadUrl(startUrl)
-                } else {
-                    webView.reload()
-                }
-            }
-            handler.postDelayed(this, refreshInterval) // Refresh every X minutes
-        }
+        val serviceIntent = Intent(this, KeepAwakeService::class.java)
+        stopService(serviceIntent)
+        // Do not call webView.onPause() — avoids aggressive refresh when returning from lock.
     }
 
     private var isAtViewPage = false
@@ -439,6 +448,22 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView = findViewById(R.id.webView)
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+        swipeRefreshLayout.webView = webView
+
+        // Harder to trigger accidentally; leave status-bar zone for notification shade.
+        val density = resources.displayMetrics.density
+        swipeRefreshLayout.setDistanceToTriggerSync((160 * density).toInt())
+        ViewCompat.setOnApplyWindowInsetsListener(swipeRefreshLayout) { _, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            swipeRefreshLayout.topGestureExclusionPx = statusBars.top + (48 * density)
+            insets
+        }
+        ViewCompat.requestApplyInsets(swipeRefreshLayout)
+
+        swipeRefreshLayout.setOnRefreshListener {
+            webView.reload()
+        }
 
         // WebView settings
         val webSettings = webView.settings
@@ -462,7 +487,7 @@ class MainActivity : AppCompatActivity() {
         // Enable maximum performance
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
-        // Setup JS Bridge for Offline Sync + Native Upload
+        // Setup JS Bridge for Offline Sync + Native Upload + blob downloads
         val syncCoordinator = com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator(this)
         webView.addJavascriptInterface(
             com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(
@@ -471,6 +496,7 @@ class MainActivity : AppCompatActivity() {
             ),
             "EyedeeaPhotosNativeBridge"
         )
+        webView.addJavascriptInterface(BlobDownloadBridge(), "BlobDownloadBridge")
 
         // --- Download Logic ---
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
@@ -666,8 +692,10 @@ class MainActivity : AppCompatActivity() {
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
+                // Only update chrome UI here — re-running auth injection on every SPA
+                // history update can bounce users through login pages repeatedly.
+                persistLastUrl(url)
                 updateSettingsIconVisibility(url)
-                checkUrlAndInjectToken(view, url)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -675,11 +703,18 @@ class MainActivity : AppCompatActivity() {
                 Log.d("AUTH_DEBUG", "onPageFinished: $url")
                 
                 findViewById<View>(R.id.progressBar)?.visibility = View.GONE
+                swipeRefreshLayout.isRefreshing = false
                 
                 if (url != "file:///android_asset/error.html") {
                     sharedPreferences.edit { putBoolean(SERVER_DOWN, false) }
                 }
                 
+                // Reset token injection count on successful load of an app page
+                if (url != null && !url.contains("login") && !url.contains("app-login")) {
+                    tokenInjectionCount = 0
+                }
+
+                persistLastUrl(url)
                 updateSettingsIconVisibility(url)
                 checkUrlAndInjectToken(view, url)
             }
@@ -701,6 +736,23 @@ class MainActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
                     handleLoadError()
                 }
+            }
+
+            override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                // After a long lock Android often kills the WebView renderer. The WebView is
+                // unusable afterward — recreate the activity and reopen the last in-app URL.
+                Log.e(
+                    "WEBVIEW_DEBUG",
+                    "Render process gone didCrash=${detail?.didCrash()} — recreating activity"
+                )
+                if (view === webView) {
+                    view.post {
+                        if (!isFinishing && !isDestroyed) {
+                            recreate()
+                        }
+                    }
+                }
+                return true
             }
         }
 
@@ -810,28 +862,240 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleDownload(url: String, userAgent: String, contentDisposition: String, mimetype: String) {
-        // Check for permissions first
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            // Store download info and request permission
+        // Check for permissions first (pre-Q writing to public Downloads)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
             pendingDownloadUrl = url
             pendingUserAgent = userAgent
             pendingContentDisposition = contentDisposition
             pendingMimetype = mimetype
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), storagePermissionRequestCode)
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                storagePermissionRequestCode
+            )
             return
         }
 
-        // All downloads are now HTTP/HTTPS, so we can use the standard DownloadManager.
-        downloadWithManager(url, userAgent, contentDisposition, mimetype)
+        when {
+            url.startsWith("blob:", ignoreCase = true) -> downloadBlobUrl(url, contentDisposition, mimetype)
+            url.startsWith("data:", ignoreCase = true) -> {
+                val fileName = guessDownloadFileName(url, contentDisposition, mimetype)
+                saveDataUrlToDownloads(url, fileName, mimetype.ifBlank { "application/octet-stream" })
+            }
+            url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true) ->
+                downloadWithManager(url, userAgent, contentDisposition, mimetype)
+            else -> {
+                Toast.makeText(this, "Download failed: unsupported URL", Toast.LENGTH_LONG).show()
+                Log.e("DOWNLOAD_ERROR", "Unsupported download URL scheme: ${url.take(80)}")
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != storagePermissionRequestCode) return
+        val url = pendingDownloadUrl
+        val ua = pendingUserAgent
+        val disposition = pendingContentDisposition
+        val mime = pendingMimetype
+        pendingDownloadUrl = null
+        pendingUserAgent = null
+        pendingContentDisposition = null
+        pendingMimetype = null
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED &&
+            url != null && ua != null && disposition != null && mime != null
+        ) {
+            handleDownload(url, ua, disposition, mime)
+        } else if (url != null) {
+            Toast.makeText(this, "Storage permission required to download", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun guessDownloadFileName(url: String, contentDisposition: String, mimetype: String): String {
+        val guessed = URLUtil.guessFileName(
+            if (url.startsWith("blob:") || url.startsWith("data:")) "download" else url,
+            contentDisposition,
+            mimetype
+        )
+        return guessed.ifBlank { "download_${System.currentTimeMillis()}" }
+    }
+
+    private var blobDownloadBuffer: java.io.ByteArrayOutputStream? = null
+    private var blobDownloadFileName: String? = null
+    private var blobDownloadMime: String? = null
+
+    /**
+     * DownloadManager cannot fetch blob: URIs. Read the blob in-page and stream
+     * base64 chunks to native code (avoids Binder size limits on large photos).
+     */
+    private fun downloadBlobUrl(blobUrl: String, contentDisposition: String, mimetype: String) {
+        val fileName = guessDownloadFileName(blobUrl, contentDisposition, mimetype)
+        val mime = mimetype.ifBlank { "application/octet-stream" }
+        val js = """
+            (async function() {
+                try {
+                    const resp = await fetch(${JSONObject.quote(blobUrl)});
+                    const blob = await resp.blob();
+                    const buffer = await blob.arrayBuffer();
+                    const bytes = new Uint8Array(buffer);
+                    const chunkSize = 256 * 1024;
+                    function toBase64(u8) {
+                        let binary = '';
+                        const len = u8.length;
+                        for (let i = 0; i < len; i++) binary += String.fromCharCode(u8[i]);
+                        return btoa(binary);
+                    }
+                    BlobDownloadBridge.begin(${JSONObject.quote(fileName)}, ${JSONObject.quote(mime)});
+                    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+                        const end = Math.min(offset + chunkSize, bytes.length);
+                        BlobDownloadBridge.append(toBase64(bytes.subarray(offset, end)));
+                    }
+                    BlobDownloadBridge.finish();
+                } catch (e) {
+                    BlobDownloadBridge.error(String(e && e.message ? e.message : e));
+                }
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+        Toast.makeText(this, "Preparing download...", Toast.LENGTH_SHORT).show()
+    }
+
+    private inner class BlobDownloadBridge {
+        @JavascriptInterface
+        fun begin(fileName: String?, mimeType: String?) {
+            blobDownloadBuffer = java.io.ByteArrayOutputStream()
+            blobDownloadFileName = fileName?.ifBlank { null } ?: "download_${System.currentTimeMillis()}"
+            blobDownloadMime = mimeType?.ifBlank { null } ?: "application/octet-stream"
+        }
+
+        @JavascriptInterface
+        fun append(base64Chunk: String?) {
+            if (base64Chunk.isNullOrBlank()) return
+            try {
+                val bytes = Base64.decode(base64Chunk, Base64.DEFAULT)
+                blobDownloadBuffer?.write(bytes)
+            } catch (e: Exception) {
+                Log.e("DOWNLOAD_ERROR", "Blob chunk decode failed: ${e.message}")
+            }
+        }
+
+        @JavascriptInterface
+        fun finish() {
+            val bytes = blobDownloadBuffer?.toByteArray()
+            val fileName = blobDownloadFileName ?: "download_${System.currentTimeMillis()}"
+            val mime = blobDownloadMime ?: "application/octet-stream"
+            blobDownloadBuffer = null
+            blobDownloadFileName = null
+            blobDownloadMime = null
+            runOnUiThread {
+                if (bytes == null || bytes.isEmpty()) {
+                    Toast.makeText(this@MainActivity, "Download failed: empty file", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                saveBytesToDownloads(bytes, fileName, mime)
+            }
+        }
+
+        @JavascriptInterface
+        fun save(dataUrl: String?, fileName: String?, mimeType: String?) {
+            // Kept for small data: URLs
+            runOnUiThread {
+                if (dataUrl.isNullOrBlank()) {
+                    Toast.makeText(this@MainActivity, "Download failed: empty file", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                saveDataUrlToDownloads(
+                    dataUrl,
+                    fileName?.ifBlank { null } ?: "download_${System.currentTimeMillis()}",
+                    mimeType?.ifBlank { null } ?: "application/octet-stream"
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun error(message: String?) {
+            blobDownloadBuffer = null
+            blobDownloadFileName = null
+            blobDownloadMime = null
+            runOnUiThread {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Download failed: ${message ?: "unknown error"}",
+                    Toast.LENGTH_LONG
+                ).show()
+                Log.e("DOWNLOAD_ERROR", "Blob download error: $message")
+            }
+        }
+    }
+
+    private fun saveDataUrlToDownloads(dataUrl: String, fileName: String, mimeType: String) {
+        try {
+            val base64 = dataUrl.substringAfter("base64,", missingDelimiterValue = "")
+            if (base64.isEmpty()) {
+                Toast.makeText(this, "Download failed: invalid file data", Toast.LENGTH_LONG).show()
+                return
+            }
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            saveBytesToDownloads(bytes, fileName, mimeType)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e("DOWNLOAD_ERROR", "Error saving data download: ${e.message}", e)
+        }
+    }
+
+    private fun saveBytesToDownloads(bytes: ByteArray, fileName: String, mimeType: String) {
+        try {
+            if (bytes.isEmpty()) {
+                Toast.makeText(this, "Download failed: empty file", Toast.LENGTH_LONG).show()
+                return
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val resolver = contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: throw IllegalStateException("Unable to create download entry")
+                resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: throw IllegalStateException("Unable to write download")
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!dir.exists()) dir.mkdirs()
+                val outFile = File(dir, fileName)
+                FileOutputStream(outFile).use { it.write(bytes) }
+            }
+
+            Toast.makeText(this, "Saved to Downloads: $fileName", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e("DOWNLOAD_ERROR", "Error saving download: ${e.message}", e)
+        }
     }
 
     private fun downloadWithManager(url: String, userAgent: String, contentDisposition: String, mimetype: String) {
         try {
             val request = DownloadManager.Request(Uri.parse(url))
-            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+            val fileName = guessDownloadFileName(url, contentDisposition, mimetype)
 
             request.setMimeType(mimetype)
             request.addRequestHeader("User-Agent", userAgent)
+            val token = authRepository.getToken()
+            if (!token.isNullOrBlank()) {
+                request.addRequestHeader("Authorization", "Bearer $token")
+            }
             request.setDescription("Downloading file...")
             request.setTitle(fileName)
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -899,11 +1163,16 @@ class MainActivity : AppCompatActivity() {
         val role = authRepository.getGroup() ?: "user"
         val baseUrl = BuildConfig.BASE_URL.removeSuffix("/")
         
-        val libraryUrl = if (role == "user" || role == "auth_user" || role == "public_user") {
+        val fallbackHome = if (role == "user" || role == "auth_user" || role == "public_user") {
             "$baseUrl/pricing"
         } else {
             "$baseUrl/library"
         }
+        // Return to where the user was (albums, etc.), not always home — unlock/process death
+        // often briefly hits /app-login before tokens are re-injected.
+        val redirectUrl = sharedPreferences.getString(LAST_WEBVIEW_URL, null)
+            ?.takeIf { isPersistableAppUrl(it) }
+            ?: fallbackHome
 
         // Escape backslashes and single quotes for JS
         val escapedUserJson = userJson.replace("\\", "\\\\").replace("'", "\\'")
@@ -925,14 +1194,14 @@ class MainActivity : AppCompatActivity() {
                     localStorage.setItem('auth_user', JSON.stringify(userObj));
                     localStorage.setItem('auth_group', '$role');
                     console.log('Injection successful');
-                    window.location.replace('$libraryUrl');
+                    window.location.replace('$redirectUrl');
                 } catch (e) {
                     console.error('Injection failed: ' + e);
                 }
             })();
         """.trimIndent()
 
-        Log.d("AUTH_DEBUG", "Injecting storage and redirecting via JS")
+        Log.d("AUTH_DEBUG", "Injecting storage and redirecting via JS to $redirectUrl")
         webView.evaluateJavascript(js, null)
     }
 

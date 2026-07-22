@@ -6,10 +6,17 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <WebView
-        android:id="@+id/webView"
+    <com.eyediatech.eyedeeaphotos.ui.WebViewSwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </com.eyediatech.eyedeeaphotos.ui.WebViewSwipeRefreshLayout>
 
     <ProgressBar
         android:id="@+id/progressBar"
