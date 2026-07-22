@@ -29,6 +29,8 @@ class SettingsActivity : FragmentActivity() {
         binding.userNameTextView.text = username
         binding.avatarTextView.text = username.take(1).uppercase()
         binding.userEmailTextView.text = authRepository.getEmail() ?: "No Email"
+        
+        binding.versionTextView.text = getString(com.eyediatech.eyedeeaphotos.R.string.version_info, com.eyediatech.eyedeeaphotos.BuildConfig.VERSION_NAME)
 
         binding.logoutButton.setOnClickListener { logout() }
     }
