@@ -68,8 +68,8 @@ android {
         applicationId = "com.eyediatech.eyedeeaphotos"
         minSdk = 21
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.14"
+        versionCode = 16
+        versionName = "1.15"
         vectorDrawables.useSupportLibrary = true
     }
 

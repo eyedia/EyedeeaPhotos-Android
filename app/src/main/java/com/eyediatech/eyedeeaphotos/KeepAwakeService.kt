@@ -23,10 +23,21 @@ class KeepAwakeService : Service() {
     override fun onCreate() {
         super.onCreate()
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        // SCREEN_BRIGHT_WAKE_LOCK forces maximum brightness and causes device heating/throttling.
-        // Changing to SCREEN_DIM_WAKE_LOCK to prevent the device from becoming super slow.
+        
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager
+        val isTv = uiModeManager.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        
+        // On TV, we need FULL_WAKE_LOCK to prevent the screensaver from kicking in.
+        // On mobile, FULL_WAKE_LOCK or SCREEN_BRIGHT_WAKE_LOCK caused heating, so we use SCREEN_DIM_WAKE_LOCK.
+        // The Window FLAG_KEEP_SCREEN_ON in MainActivity will keep the screen bright while in foreground.
         @Suppress("DEPRECATION")
-        wakeLock = powerManager.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE, WAKE_LOCK_TAG)
+        val lockType = if (isTv) {
+            PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP
+        } else {
+            PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP
+        }
+
+        wakeLock = powerManager.newWakeLock(lockType or PowerManager.ON_AFTER_RELEASE, WAKE_LOCK_TAG)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

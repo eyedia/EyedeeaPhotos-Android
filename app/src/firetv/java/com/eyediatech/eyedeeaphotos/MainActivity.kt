@@ -27,10 +27,19 @@ class MainActivity : FragmentActivity() {
         if (!isAtView) {
             isInfoOpen = false
         }
+        val serviceIntent = Intent(this, com.eyediatech.eyedeeaphotos.KeepAwakeService::class.java)
         if (isAtView) {
             window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            binding.webView.keepScreenOn = true
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
         } else {
             window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            binding.webView.keepScreenOn = false
+            stopService(serviceIntent)
         }
     }
 
@@ -48,6 +57,24 @@ class MainActivity : FragmentActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setupWebView()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (isAtViewPage) {
+            val serviceIntent = Intent(this, com.eyediatech.eyedeeaphotos.KeepAwakeService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val serviceIntent = Intent(this, com.eyediatech.eyedeeaphotos.KeepAwakeService::class.java)
+        stopService(serviceIntent)
     }
 
     @SuppressLint("RestrictedApi")

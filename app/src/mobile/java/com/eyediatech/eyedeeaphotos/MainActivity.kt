@@ -420,6 +420,7 @@ class MainActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, KeepAwakeService::class.java)
         if (isAtView) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            webView.keepScreenOn = true
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { 
                 startForegroundService(serviceIntent) 
             } else { 
@@ -427,6 +428,7 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            webView.keepScreenOn = false
             stopService(serviceIntent)
         }
     }
