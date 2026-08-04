@@ -62,6 +62,7 @@ class MainActivity : FragmentActivity() {
                 if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) {
                     isInfoOpen = !isInfoOpen
                     binding.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('eyedeea:view:action', { detail: { action: 'toggle_info' } }));", null)
+                    binding.webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true}));", null)
                     return true
                 }
                 if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInfoOpen) {
@@ -82,6 +83,9 @@ class MainActivity : FragmentActivity() {
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
         webSettings.userAgentString = com.eyediatech.eyedeeaphotos.utils.UserAgentUtils.getUserAgent(this)
+
+        binding.webView.isFocusable = true
+        binding.webView.isFocusableInTouchMode = true
         
         // binding.webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
 
@@ -225,6 +229,7 @@ class MainActivity : FragmentActivity() {
                 binding.progressBar.visibility = android.view.View.GONE
                 updateKeepAwake(url)
                 checkUrlAndInjectToken(view, url)
+                view?.requestFocus()
             }
 
             @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.M)
