@@ -5,7 +5,8 @@ import com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator
 
 class EyedeeaPhotosJsBridge(
     private val syncCoordinator: OfflineSyncCoordinator,
-    private val onOpenNativeUpload: ((String?) -> Boolean)? = null
+    private val onOpenNativeUpload: ((String?) -> Boolean)? = null,
+    private val onClearSession: (() -> Unit)? = null
 ) {
     @JavascriptInterface
     fun requestOfflineSync(jsonPayload: String?): Boolean {
@@ -24,5 +25,13 @@ class EyedeeaPhotosJsBridge(
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * Clears the native session on web logout.
+     */
+    @JavascriptInterface
+    fun clearSession() {
+        onClearSession?.invoke()
     }
 }

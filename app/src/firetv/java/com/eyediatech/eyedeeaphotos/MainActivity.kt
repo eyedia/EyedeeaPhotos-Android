@@ -128,7 +128,23 @@ class MainActivity : FragmentActivity() {
         // Setup JS Bridge for Offline Sync
         val syncCoordinator = com.eyediatech.eyedeeaphotos.sync.OfflineSyncCoordinator(this)
         binding.webView.addJavascriptInterface(
-            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(syncCoordinator),
+            com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(
+                syncCoordinator,
+                onOpenNativeUpload = null,
+                onClearSession = {
+                    runOnUiThread {
+                        authRepository.clearAuthData()
+                        try {
+                            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                            android.webkit.WebStorage.getInstance().deleteAllData()
+                        } catch (e: Exception) {
+                            android.util.Log.e("AUTH_DEBUG", "Failed to clear WebView storage", e)
+                        }
+                        startActivity(Intent(this@MainActivity, com.eyediatech.eyedeeaphotos.ui.LoginActivity::class.java))
+                        finish()
+                    }
+                }
+            ),
             "EyedeeaPhotosNativeBridge"
         )
 

@@ -494,7 +494,20 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(
             com.eyediatech.eyedeeaphotos.bridge.EyedeeaPhotosJsBridge(
                 syncCoordinator,
-                onOpenNativeUpload = { payload -> handleOpenNativeUploadPayload(payload) }
+                onOpenNativeUpload = { payload -> handleOpenNativeUploadPayload(payload) },
+                onClearSession = {
+                    runOnUiThread {
+                        authRepository.clearAuthData()
+                        try {
+                            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                            android.webkit.WebStorage.getInstance().deleteAllData()
+                        } catch (e: Exception) {
+                            Log.e("AUTH_DEBUG", "Failed to clear WebView storage", e)
+                        }
+                        startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+                        finish()
+                    }
+                }
             ),
             "EyedeeaPhotosNativeBridge"
         )

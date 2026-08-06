@@ -24,11 +24,26 @@ class SettingsActivity : FragmentActivity() {
         setupUI()
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateUserUI()
+    }
+
+    private fun updateUserUI() {
+        if (!authRepository.isAuthenticated()) {
+            binding.userNameTextView.text = "Signed Out"
+            binding.avatarTextView.text = "?"
+            binding.userEmailTextView.text = "Not logged in"
+        } else {
+            val username = authRepository.getUsername() ?: "User"
+            binding.userNameTextView.text = username
+            binding.avatarTextView.text = username.take(1).uppercase()
+            binding.userEmailTextView.text = authRepository.getEmail() ?: "No Email"
+        }
+    }
+
     private fun setupUI() {
-        val username = authRepository.getUsername() ?: "User"
-        binding.userNameTextView.text = username
-        binding.avatarTextView.text = username.take(1).uppercase()
-        binding.userEmailTextView.text = authRepository.getEmail() ?: "No Email"
+        updateUserUI()
         
         binding.versionTextView.text = getString(com.eyediatech.eyedeeaphotos.R.string.version_info, com.eyediatech.eyedeeaphotos.BuildConfig.VERSION_NAME)
 

@@ -46,6 +46,13 @@ class LoginActivity : AppCompatActivity() {
             val errorDescription = data.getQueryParameter("error_description")
 
             if (!error.isNullOrBlank()) {
+                authRepository.clearAuthData()
+                try {
+                    android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                    android.webkit.WebStorage.getInstance().deleteAllData()
+                } catch (e: Exception) {
+                    android.util.Log.e("AUTH_DEBUG", "Failed to clear WebView storage", e)
+                }
                 showErrorDialog(getString(R.string.login_error_title), errorDescription ?: getString(R.string.login_error_generic))
                 return
             }
