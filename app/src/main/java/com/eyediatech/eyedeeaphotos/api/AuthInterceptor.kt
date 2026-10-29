@@ -25,10 +25,12 @@ class AuthInterceptor(private val context: Context, private val authRepository: 
         if (expiresAt > 0 && expiresAt - now < 60000) {
             val refreshToken = authRepository.getRefreshToken()
             if (!refreshToken.isNullOrEmpty()) {
+                // performTokenRefresh now handles logging out if explicitly rejected (401/400)
+                // If it returns false (e.g. due to network error), we do NOT log out.
                 val refreshSuccess = performTokenRefresh(refreshToken)
                 if (!refreshSuccess) {
-                    handleLogout()
-                    return chain.proceed(request) // proceed anyway to let 401 fail normally or handle otherwise
+                    // Let the request proceed with the old token. If the server throws 401, the reactive check will handle it.
+                    // If it's a network error, the call will fail normally without wiping the user's session.
                 }
             } else {
                 handleLogout()
@@ -56,6 +58,7 @@ class AuthInterceptor(private val context: Context, private val authRepository: 
             
             val refreshToken = authRepository.getRefreshToken()
             if (!refreshToken.isNullOrEmpty()) {
+                // performTokenRefresh now handles logging out if explicitly rejected
                 val refreshSuccess = performTokenRefresh(refreshToken)
                 if (refreshSuccess) {
                     val newToken = authRepository.getToken()
@@ -65,8 +68,6 @@ class AuthInterceptor(private val context: Context, private val authRepository: 
                             .build()
                         response = chain.proceed(newRequest)
                     }
-                } else {
-                    handleLogout()
                 }
             } else {
                 handleLogout()
@@ -93,6 +94,9 @@ class AuthInterceptor(private val context: Context, private val authRepository: 
                     authRepository.saveTokens(body.token, body.refreshToken ?: refreshToken)
                     return true
                 }
+            } else if (response.code() == 401 || response.code() == 400) {
+                // Explicitly rejected by the server
+                handleLogout()
             }
         } catch (e: Exception) {
             e.printStackTrace()
