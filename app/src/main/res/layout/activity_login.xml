@@ -102,10 +102,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:gravity="center"
-            android:letterSpacing="0.2"
+            android:letterSpacing="0.1"
             android:paddingVertical="4dp"
             android:textColor="@color/text_primary"
-            android:textSize="64sp"
+            android:textSize="48sp"
             android:textStyle="bold"
             tools:text="ABCD-1234" />
 

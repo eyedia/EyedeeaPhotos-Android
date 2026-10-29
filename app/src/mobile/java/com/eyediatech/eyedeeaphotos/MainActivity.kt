@@ -610,6 +610,14 @@ class MainActivity : AppCompatActivity() {
                             val isUnauthenticatedPage = path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")
                             
                             if (isUnauthenticatedPage) {
+                                val reason = uri.getQueryParameter("reason")
+                                if (reason == "session_expired" || reason == "unauthenticated") {
+                                    Log.d("AUTH_DEBUG", "Session expired or unauthenticated. Logging out.")
+                                    authRepository.clearAuthData()
+                                    startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+                                    finish()
+                                    return
+                                }
                                 Log.d("AUTH_DEBUG", "Detected unauthenticated page while authenticated locally. URL: $url")
                                 view?.visibility = View.INVISIBLE
                                 view?.post {
@@ -639,6 +647,14 @@ class MainActivity : AppCompatActivity() {
                     if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
                         val path = uri.path ?: ""
                         if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                            val reason = uri.getQueryParameter("reason")
+                            if (reason == "session_expired" || reason == "unauthenticated") {
+                                Log.d("AUTH_DEBUG", "Session expired or unauthenticated. Logging out.")
+                                authRepository.clearAuthData()
+                                startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+                                finish()
+                                return true
+                            }
                             Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading. URL: ${request.url}")
                             view?.visibility = View.INVISIBLE
                             view?.post {
@@ -671,6 +687,14 @@ class MainActivity : AppCompatActivity() {
                         if (uri.host?.endsWith("eyedeeaphotos.com") == true || uri.host == baseUrlUri.host) {
                             val path = uri.path ?: ""
                             if (path == "" || path == "/" || path.startsWith("/login") || path.startsWith("/app-login") || path.startsWith("/home") || path.startsWith("/auth")) {
+                                val reason = uri.getQueryParameter("reason")
+                                if (reason == "session_expired" || reason == "unauthenticated") {
+                                    Log.d("AUTH_DEBUG", "Session expired or unauthenticated. Logging out.")
+                                    authRepository.clearAuthData()
+                                    startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+                                    finish()
+                                    return true
+                                }
                                 Log.d("AUTH_DEBUG", "Intercepted unauthenticated page in shouldOverrideUrlLoading (deprecated). URL: $url")
                                 view?.visibility = View.INVISIBLE
                                 view?.post {
