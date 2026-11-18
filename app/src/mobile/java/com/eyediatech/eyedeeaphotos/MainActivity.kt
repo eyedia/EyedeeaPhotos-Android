@@ -126,9 +126,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showUploadBlockedDialog(message: String) {
-        val builder = AlertDialog.Builder(this)
+        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
         if (message != "Upload is not enabled.") {
-            builder.setTitle("Limit exhausted")
+            builder.setTitle("Limit Exhausted")
+            builder.setIcon(R.drawable.ic_notification)
+        } else {
+            builder.setTitle("Upload Disabled")
         }
         builder.setMessage(message)
             .setPositiveButton(android.R.string.ok, null)

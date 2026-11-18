@@ -75,7 +75,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun showErrorDialog(title: String, message: String) {
-        AlertDialog.Builder(this)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton(getString(R.string.ok)) { dialog, _ -> dialog.dismiss() }

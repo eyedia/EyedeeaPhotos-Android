@@ -75,9 +75,12 @@ class SettingsActivity : AppCompatActivity() {
             )) {
                 is UploadAllowance.Gate.Blocked -> {
                     if (!isFinishing) {
-                        val builder = AlertDialog.Builder(this@SettingsActivity)
+                        val builder = com.google.android.material.dialog.MaterialAlertDialogBuilder(this@SettingsActivity)
                         if (gate.message != "Upload is not enabled.") {
-                            builder.setTitle("Limit exhausted")
+                            builder.setTitle("Limit Exhausted")
+                            builder.setIcon(R.drawable.ic_notification)
+                        } else {
+                            builder.setTitle("Upload Disabled")
                         }
                         builder.setMessage(gate.message)
                             .setPositiveButton(android.R.string.ok, null)
@@ -272,7 +275,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showRemoveDialog(photo: QueuedPhoto) {
-        AlertDialog.Builder(this)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("Remove Photo")
             .setMessage("Do you want to remove this photo from the queue?")
             .setPositiveButton("Remove") { _, _ ->
