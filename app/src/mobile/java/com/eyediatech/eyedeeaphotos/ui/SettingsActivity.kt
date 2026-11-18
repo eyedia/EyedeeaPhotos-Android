@@ -77,7 +77,7 @@ class SettingsActivity : AppCompatActivity() {
                     if (!isFinishing) {
                         val builder = AlertDialog.Builder(this@SettingsActivity)
                         if (gate.message != "Upload is not enabled.") {
-                            builder.setTitle("Upload is not enabled")
+                            builder.setTitle("Limit exhausted")
                         }
                         builder.setMessage(gate.message)
                             .setPositiveButton(android.R.string.ok, null)
