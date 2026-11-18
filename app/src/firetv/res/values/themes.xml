@@ -9,7 +9,7 @@
 
     <style name="Theme.EyedeeaPhotos.Launcher" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/black</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_firetv_launcher_round</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.EyedeeaPhotos.Leanback</item>
     </style>
 </resources>
