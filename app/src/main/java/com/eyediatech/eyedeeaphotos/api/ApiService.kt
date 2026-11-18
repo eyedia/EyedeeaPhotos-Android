@@ -32,6 +32,12 @@ interface ApiService {
         @Path("sourceId") sourceId: String
     ): Response<QuotaResponse>
 
+    @GET("/api/v1/households/{householdId}/limits/allowance")
+    suspend fun getAllowance(
+        @Header("Authorization") token: String,
+        @Path("householdId") householdId: String
+    ): Response<AllowanceResponse>
+
     @Multipart
     @POST("/api/v1/{householdId}/sources/{sourceId}/browse/upload")
     suspend fun uploadPhotos(
@@ -109,4 +115,13 @@ data class ZipPhotoEntry(
     val source_id: Long,
     val filename: String,
     val folder_name: String
+)
+
+data class AllowanceResponse(
+    val data: AllowanceData?
+)
+
+data class AllowanceData(
+    val uploadsEnabled: Boolean?,
+    val uploadResumeAt: String?
 )

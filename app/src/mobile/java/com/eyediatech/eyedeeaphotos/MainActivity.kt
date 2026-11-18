@@ -46,6 +46,12 @@ import java.net.URL
 
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
+import com.eyediatech.eyedeeaphotos.api.RetrofitClient
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
@@ -101,6 +107,58 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingDestinationAlbum: String? = null
 
+    private fun checkUploadAllowanceAndProceed(onBlocked: (() -> Unit)? = null, onSuccess: () -> Unit) {
+        val householdId = authRepository.getHouseholdId()
+        val token = authRepository.getToken()
+        if (householdId.isNullOrEmpty() || token.isNullOrEmpty()) {
+            onSuccess()
+            return
+        }
+        
+        lifecycleScope.launch(Dispatchers.Main) {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.instance.getAllowance("Bearer $token", householdId)
+                }
+                
+                if (response.isSuccessful) {
+                    val allowanceData = response.body()?.data
+                    val prefs = getSharedPreferences("UploadPrefs", MODE_PRIVATE)
+                    
+                    if (allowanceData?.uploadsEnabled == false) {
+                        val resumeAt = allowanceData.uploadResumeAt
+                        if (!resumeAt.isNullOrEmpty()) {
+                            prefs.edit().putString("uploadResumeAt", resumeAt).apply()
+                            try {
+                                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
+                                val date = isoFormat.parse(resumeAt)
+                                if (date != null) {
+                                    val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
+                                    localFormat.timeZone = TimeZone.getDefault()
+                                    val localTime = localFormat.format(date)
+                                    Toast.makeText(this@MainActivity, "You can upload after $localTime", Toast.LENGTH_LONG).show()
+                                    onBlocked?.invoke()
+                                    return@launch
+                                }
+                            } catch (e: Exception) {
+                                Log.e("ALLOWANCE", "Failed to parse uploadResumeAt", e)
+                            }
+                        }
+                        Toast.makeText(this@MainActivity, "Uploads are used up for this period.", Toast.LENGTH_LONG).show()
+                        onBlocked?.invoke()
+                        return@launch
+                    } else {
+                        prefs.edit().remove("uploadResumeAt").apply()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ALLOWANCE", "Failed to check upload allowance", e)
+            }
+            onSuccess()
+        }
+    }
+
     private fun checkNotificationPermissionAndProceed() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(
@@ -129,13 +187,13 @@ class MainActivity : AppCompatActivity() {
                     view.findViewById<View>(R.id.optionCurrentAlbum).setOnClickListener {
                         pendingDestinationAlbum = albumPath
                         bottomSheetDialog.dismiss()
-                        checkNotificationPermissionAndProceed()
+                        checkUploadAllowanceAndProceed { checkNotificationPermissionAndProceed() }
                     }
 
                     view.findViewById<View>(R.id.optionRawCurate).setOnClickListener {
                         pendingDestinationAlbum = null
                         bottomSheetDialog.dismiss()
-                        checkNotificationPermissionAndProceed()
+                        checkUploadAllowanceAndProceed { checkNotificationPermissionAndProceed() }
                     }
 
                     bottomSheetDialog.setContentView(view)
@@ -145,7 +203,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             pendingDestinationAlbum = albumPath?.takeIf { it.isNotBlank() }
-            checkNotificationPermissionAndProceed()
+            checkUploadAllowanceAndProceed { checkNotificationPermissionAndProceed() }
         }
     }
 
@@ -401,6 +459,10 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
             }
         }
+        
+        // Check allowance on resume
+        checkUploadAllowanceAndProceed {}
+        
         // Do not call webView.onResume() — it can make the web app refresh on unlock.
         // Users refresh manually via pull-to-refresh.
     }
@@ -822,15 +884,19 @@ class MainActivity : AppCompatActivity() {
                     else -> acceptTypes.firstOrNull { !it.isNullOrBlank() } ?: "*/*"
                 }
 
-                return try {
-                    webViewFileChooserLauncher.launch(mimeType)
-                    true
-                } catch (e: Exception) {
-                    Log.e("WEBVIEW_FILE", "Failed to launch file chooser", e)
+                checkUploadAllowanceAndProceed(onBlocked = {
+                    webViewFilePathCallback?.onReceiveValue(null)
                     webViewFilePathCallback = null
-                    filePathCallback?.onReceiveValue(null)
-                    false
+                }) {
+                    try {
+                        webViewFileChooserLauncher.launch(mimeType)
+                    } catch (e: Exception) {
+                        Log.e("WEBVIEW_FILE", "Failed to launch file chooser", e)
+                        webViewFilePathCallback?.onReceiveValue(null)
+                        webViewFilePathCallback = null
+                    }
                 }
+                return true
             }
         }
 

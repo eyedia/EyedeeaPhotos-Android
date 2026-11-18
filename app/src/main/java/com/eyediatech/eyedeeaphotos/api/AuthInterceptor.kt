@@ -94,9 +94,17 @@ class AuthInterceptor(private val context: Context, private val authRepository: 
                     authRepository.saveTokens(body.token, body.refreshToken ?: refreshToken)
                     return true
                 }
-            } else if (response.code() == 401 || response.code() == 400) {
-                // Explicitly rejected by the server
-                handleLogout()
+            } else if (response.code() == 401) {
+                val errorBody = response.errorBody()?.string()
+                // Start device activation only when refresh itself fails with 401 { "message": "Invalid refresh token" }
+                if (errorBody?.contains("Invalid refresh token") == true) {
+                    handleLogout()
+                }
+            } else if (response.code() == 403) {
+                val errorBody = response.errorBody()?.string()
+                if (errorBody?.contains("ACCOUNT_DEACTIVATED") == true) {
+                    handleLogout()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

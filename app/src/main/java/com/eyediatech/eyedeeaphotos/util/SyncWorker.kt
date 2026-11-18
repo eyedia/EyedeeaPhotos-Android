@@ -10,11 +10,16 @@ import com.eyediatech.eyedeeaphotos.data.QueuedPhoto
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.repository.PhotoRepository
 import com.eyediatech.eyedeeaphotos.utils.FileLogger
+import org.json.JSONObject
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -121,6 +126,25 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             FileLogger.d("SyncWorker", "No photos to upload")
             return Result.success()
         }
+        
+        // Check if we are in a block period due to 409 UPLOAD_ALLOWANCE_EXHAUSTED
+        val prefs = applicationContext.getSharedPreferences("UploadPrefs", Context.MODE_PRIVATE)
+        val resumeAtStr = prefs.getString("uploadResumeAt", null)
+        if (resumeAtStr != null) {
+            try {
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
+                val resumeAtDate = isoFormat.parse(resumeAtStr)
+                if (resumeAtDate != null && Date().before(resumeAtDate)) {
+                    FileLogger.w("SyncWorker", "Uploads are blocked until $resumeAtStr")
+                    return Result.success() // Wait for next scheduled sync
+                } else {
+                    prefs.edit().remove("uploadResumeAt").apply()
+                }
+            } catch (e: Exception) {
+                prefs.edit().remove("uploadResumeAt").apply()
+            }
+        }
 
         try {
             // If the worker was cancelled or failed previously, some might be stuck in UPLOADING
@@ -201,6 +225,12 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             }
 
             return Result.success()
+        } catch (e: AllowanceExhaustedException) {
+            FileLogger.w("SyncWorker", "Allowance exhausted, stopping sync")
+            return Result.success()
+        } catch (e: LimitExceededException) {
+            FileLogger.w("SyncWorker", "Limit exceeded, will retry later")
+            return Result.retry()
         } catch (e: Exception) {
             FileLogger.e("SyncWorker", "Sync exception occurred", e)
             return Result.retry()
@@ -266,13 +296,70 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             return response.body()?.uploaded ?: emptyList()
         } else {
             val errorMsg = response.errorBody()?.string() ?: "Unknown error"
-            FileLogger.e("SyncWorker", "Batch upload failed: $errorMsg")
+            FileLogger.e("SyncWorker", "Batch upload failed: ${response.code()} $errorMsg")
+            
+            if (response.code() == 409) {
+                try {
+                    val json = JSONObject(errorMsg)
+                    if (json.optString("code") == "UPLOAD_ALLOWANCE_EXHAUSTED") {
+                        val data = json.optJSONObject("data")
+                        if (data != null && data.optBoolean("uploadsEnabled") == false) {
+                            val resumeAt = if (data.has("uploadResumeAt")) data.getString("uploadResumeAt") else null
+                            if (!resumeAt.isNullOrEmpty()) {
+                                applicationContext.getSharedPreferences("UploadPrefs", Context.MODE_PRIVATE)
+                                    .edit().putString("uploadResumeAt", resumeAt).apply()
+                                
+                                try {
+                                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                                    isoFormat.timeZone = TimeZone.getTimeZone("UTC")
+                                    val date = isoFormat.parse(resumeAt)
+                                    if (date != null) {
+                                        val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
+                                        localFormat.timeZone = TimeZone.getDefault()
+                                        val localTime = localFormat.format(date)
+                                        notifyUserVisibleFailure(
+                                            title = "Upload allowance exhausted",
+                                            message = "You can upload after $localTime"
+                                        )
+                                    }
+                                } catch (e: Exception) {}
+                            } else {
+                                notifyUserVisibleFailure(
+                                    title = "Upload allowance exhausted",
+                                    message = "Uploads are used up for this period."
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    FileLogger.e("SyncWorker", "Failed to parse 409 error", e)
+                }
+                for (photo in batch) {
+                    photoRepository.updateStatus(photo.id, "QUEUED")
+                }
+                throw AllowanceExhaustedException()
+            } else if (response.code() == 503) {
+                try {
+                    val json = JSONObject(errorMsg)
+                    if (json.optString("code") == "LIMIT_EXCEEDED") {
+                        for (photo in batch) {
+                            photoRepository.updateStatus(photo.id, "QUEUED")
+                        }
+                        throw LimitExceededException()
+                    }
+                } catch (e: Exception) {
+                }
+            }
+            
             for (photo in batch) {
                 photoRepository.updateStatus(photo.id, "FAILED")
             }
             throw Exception("Batch upload failed: $errorMsg")
         }
     }
+    
+    class AllowanceExhaustedException : Exception("Upload allowance exhausted")
+    class LimitExceededException : Exception("Limit exceeded")
 
     private suspend fun triggerCuratedAnalysis(
         token: String, 
