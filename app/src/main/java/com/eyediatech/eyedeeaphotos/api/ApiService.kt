@@ -1,5 +1,7 @@
 package com.eyediatech.eyedeeaphotos.api
 
+import androidx.annotation.Keep
+import com.google.gson.annotations.SerializedName
 import com.eyediatech.eyedeeaphotos.data.*
 import retrofit2.Response
 import retrofit2.http.*
@@ -36,7 +38,7 @@ interface ApiService {
     suspend fun getAllowance(
         @Header("Authorization") token: String,
         @Path("householdId") householdId: String
-    ): Response<AllowanceResponse>
+    ): Response<okhttp3.ResponseBody>
 
     @Multipart
     @POST("/api/v1/{householdId}/sources/{sourceId}/browse/upload")
@@ -101,27 +103,30 @@ interface ApiService {
     ): retrofit2.Call<okhttp3.ResponseBody>
 }
 
-data class Source(val id: String, val name: String)
-data class ScanStatus(val active: Boolean)
+@Keep
+data class Source(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String
+)
 
+@Keep
+data class ScanStatus(
+    @SerializedName("active") val active: Boolean
+)
+
+@Keep
 data class DownloadZipRequest(
-    val size: String?,
-    val original: Boolean? = null,
-    val photoIds: List<ZipPhotoEntry>
+    @SerializedName("size") val size: String?,
+    @SerializedName("original") val original: Boolean? = null,
+    @SerializedName("photoIds") val photoIds: List<ZipPhotoEntry>
 )
 
+@Keep
 data class ZipPhotoEntry(
-    val photo_id: String,
-    val source_id: Long,
-    val filename: String,
-    val folder_name: String
+    @SerializedName("photo_id") val photo_id: String,
+    @SerializedName("source_id") val source_id: Long,
+    @SerializedName("filename") val filename: String,
+    @SerializedName("folder_name") val folder_name: String
 )
 
-data class AllowanceResponse(
-    val data: AllowanceData?
-)
 
-data class AllowanceData(
-    val uploadsEnabled: Boolean?,
-    val uploadResumeAt: String?
-)

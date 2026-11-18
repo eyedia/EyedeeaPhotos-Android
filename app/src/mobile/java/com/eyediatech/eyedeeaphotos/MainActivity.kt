@@ -122,35 +122,42 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 if (response.isSuccessful) {
-                    val allowanceData = response.body()?.data
+                    val responseStr = response.body()?.string()
+                    val json = responseStr?.let { JSONObject(it) }
+                    val data = json?.optJSONObject("data")
                     val prefs = getSharedPreferences("UploadPrefs", MODE_PRIVATE)
                     
-                    if (allowanceData?.uploadsEnabled == false) {
-                        val resumeAt = allowanceData.uploadResumeAt
-                        if (!resumeAt.isNullOrEmpty()) {
-                            prefs.edit().putString("uploadResumeAt", resumeAt).apply()
-                            try {
-                                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                                val date = isoFormat.parse(resumeAt)
-                                if (date != null) {
-                                    val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
-                                    localFormat.timeZone = TimeZone.getDefault()
-                                    val localTime = localFormat.format(date)
-                                    Toast.makeText(this@MainActivity, "You can upload after $localTime", Toast.LENGTH_LONG).show()
-                                    onBlocked?.invoke()
-                                    return@launch
+                    if (data != null && data.has("uploadsEnabled") && !data.isNull("uploadsEnabled")) {
+                        val uploadsEnabled = data.getBoolean("uploadsEnabled")
+                        if (!uploadsEnabled) {
+                            val resumeAt = if (data.has("uploadResumeAt") && !data.isNull("uploadResumeAt")) data.getString("uploadResumeAt") else null
+                            if (!resumeAt.isNullOrEmpty()) {
+                                prefs.edit().putString("uploadResumeAt", resumeAt).apply()
+                                try {
+                                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                                    isoFormat.timeZone = TimeZone.getTimeZone("UTC")
+                                    val date = isoFormat.parse(resumeAt)
+                                    if (date != null) {
+                                        val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
+                                        localFormat.timeZone = TimeZone.getDefault()
+                                        val localTime = localFormat.format(date)
+                                        Toast.makeText(this@MainActivity, "You can upload after $localTime", Toast.LENGTH_LONG).show()
+                                        onBlocked?.invoke()
+                                        return@launch
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("ALLOWANCE", "Failed to parse uploadResumeAt", e)
                                 }
-                            } catch (e: Exception) {
-                                Log.e("ALLOWANCE", "Failed to parse uploadResumeAt", e)
                             }
+                            Toast.makeText(this@MainActivity, "Uploads are used up for this period.", Toast.LENGTH_LONG).show()
+                            onBlocked?.invoke()
+                            return@launch
+                        } else {
+                            prefs.edit().remove("uploadResumeAt").apply()
                         }
-                        Toast.makeText(this@MainActivity, "Uploads are used up for this period.", Toast.LENGTH_LONG).show()
-                        onBlocked?.invoke()
-                        return@launch
-                    } else {
-                        prefs.edit().remove("uploadResumeAt").apply()
                     }
+                } else {
+                    Log.e("ALLOWANCE", "API failed: ${response.code()} ${response.errorBody()?.string()}")
                 }
             } catch (e: Exception) {
                 Log.e("ALLOWANCE", "Failed to check upload allowance", e)
