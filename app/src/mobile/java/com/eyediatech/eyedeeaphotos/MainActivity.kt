@@ -46,11 +46,7 @@ import java.net.URL
 
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
-import com.eyediatech.eyedeeaphotos.api.RetrofitClient
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import com.eyediatech.eyedeeaphotos.util.UploadAllowance
 
 class MainActivity : AppCompatActivity() {
 
@@ -107,63 +103,36 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingDestinationAlbum: String? = null
 
-    private fun checkUploadAllowanceAndProceed(onBlocked: (() -> Unit)? = null, onSuccess: () -> Unit) {
-        val householdId = authRepository.getHouseholdId()
-        val token = authRepository.getToken()
-        if (householdId.isNullOrEmpty() || token.isNullOrEmpty()) {
-            onSuccess()
-            return
-        }
-        
-        lifecycleScope.launch(Dispatchers.Main) {
-            try {
-                val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.instance.getAllowance("Bearer $token", householdId)
-                }
-                
-                if (response.isSuccessful) {
-                    val responseStr = response.body()?.string()
-                    val json = responseStr?.let { JSONObject(it) }
-                    val data = json?.optJSONObject("data")
-                    val prefs = getSharedPreferences("UploadPrefs", MODE_PRIVATE)
-                    
-                    if (data != null && data.has("uploadsEnabled") && !data.isNull("uploadsEnabled")) {
-                        val uploadsEnabled = data.getBoolean("uploadsEnabled")
-                        if (!uploadsEnabled) {
-                            val resumeAt = if (data.has("uploadResumeAt") && !data.isNull("uploadResumeAt")) data.getString("uploadResumeAt") else null
-                            if (!resumeAt.isNullOrEmpty()) {
-                                prefs.edit().putString("uploadResumeAt", resumeAt).apply()
-                                try {
-                                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                                    isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                                    val date = isoFormat.parse(resumeAt)
-                                    if (date != null) {
-                                        val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
-                                        localFormat.timeZone = TimeZone.getDefault()
-                                        val localTime = localFormat.format(date)
-                                        Toast.makeText(this@MainActivity, "You can upload after $localTime", Toast.LENGTH_LONG).show()
-                                        onBlocked?.invoke()
-                                        return@launch
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("ALLOWANCE", "Failed to parse uploadResumeAt", e)
-                                }
-                            }
-                            Toast.makeText(this@MainActivity, "Uploads are used up for this period.", Toast.LENGTH_LONG).show()
-                            onBlocked?.invoke()
-                            return@launch
-                        } else {
-                            prefs.edit().remove("uploadResumeAt").apply()
-                        }
+    private fun checkUploadAllowanceAndProceed(
+        announce: Boolean = true,
+        onBlocked: (() -> Unit)? = null,
+        onSuccess: () -> Unit
+    ) {
+        lifecycleScope.launch {
+            when (val gate = UploadAllowance.evaluate(
+                this@MainActivity,
+                authRepository.getToken(),
+                authRepository.getHouseholdId()
+            )) {
+                is UploadAllowance.Gate.Blocked -> {
+                    if (announce && !isFinishing) {
+                        showUploadBlockedDialog(gate.message)
                     }
-                } else {
-                    Log.e("ALLOWANCE", "API failed: ${response.code()} ${response.errorBody()?.string()}")
+                    onBlocked?.invoke()
                 }
-            } catch (e: Exception) {
-                Log.e("ALLOWANCE", "Failed to check upload allowance", e)
+                UploadAllowance.Gate.Allowed -> onSuccess()
             }
-            onSuccess()
         }
+    }
+
+    private fun showUploadBlockedDialog(message: String) {
+        val builder = AlertDialog.Builder(this)
+        if (message != "Upload is not enabled.") {
+            builder.setTitle("Upload is not enabled")
+        }
+        builder.setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun checkNotificationPermissionAndProceed() {
@@ -467,8 +436,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Check allowance on resume
-        checkUploadAllowanceAndProceed {}
+        // Refresh the stored allowance without a dialog. The dialog is shown when upload is tapped.
+        checkUploadAllowanceAndProceed(announce = false) {}
         
         // Do not call webView.onResume() — it can make the web app refresh on unlock.
         // Users refresh manually via pull-to-refresh.

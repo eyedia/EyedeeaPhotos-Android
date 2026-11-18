@@ -31,6 +31,7 @@ import com.eyediatech.eyedeeaphotos.databinding.ItemQueuedPhotoBinding
 import com.eyediatech.eyedeeaphotos.repository.AuthRepository
 import com.eyediatech.eyedeeaphotos.repository.PhotoRepository
 import com.eyediatech.eyedeeaphotos.util.SyncWorker
+import com.eyediatech.eyedeeaphotos.util.UploadAllowance
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -63,6 +64,29 @@ class SettingsActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { _ ->
         pickImagesLauncher.launch("image/*")
+    }
+
+    private fun checkUploadAllowanceAndProceed(onSuccess: () -> Unit) {
+        lifecycleScope.launch {
+            when (val gate = UploadAllowance.evaluate(
+                this@SettingsActivity,
+                authRepository.getToken(),
+                authRepository.getHouseholdId()
+            )) {
+                is UploadAllowance.Gate.Blocked -> {
+                    if (!isFinishing) {
+                        val builder = AlertDialog.Builder(this@SettingsActivity)
+                        if (gate.message != "Upload is not enabled.") {
+                            builder.setTitle("Upload is not enabled")
+                        }
+                        builder.setMessage(gate.message)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                }
+                UploadAllowance.Gate.Allowed -> onSuccess()
+            }
+        }
     }
 
     private fun checkLocationPermissionAndPickImages() {
@@ -146,7 +170,7 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.addPhotosButton.setOnClickListener {
             if (!isSyncing) {
-                checkLocationPermissionAndPickImages()
+                checkUploadAllowanceAndProceed { checkLocationPermissionAndPickImages() }
             }
         }
 

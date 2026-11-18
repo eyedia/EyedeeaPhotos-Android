@@ -1,7 +1,6 @@
 package com.eyediatech.eyedeeaphotos.util
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.eyediatech.eyedeeaphotos.api.RetrofitClient
@@ -16,10 +15,6 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -128,22 +123,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         }
         
         // Check if we are in a block period due to 409 UPLOAD_ALLOWANCE_EXHAUSTED
-        val prefs = applicationContext.getSharedPreferences("UploadPrefs", Context.MODE_PRIVATE)
-        val resumeAtStr = prefs.getString("uploadResumeAt", null)
-        if (resumeAtStr != null) {
-            try {
-                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                val resumeAtDate = isoFormat.parse(resumeAtStr)
-                if (resumeAtDate != null && Date().before(resumeAtDate)) {
-                    FileLogger.w("SyncWorker", "Uploads are blocked until $resumeAtStr")
-                    return Result.success() // Wait for next scheduled sync
-                } else {
-                    prefs.edit().remove("uploadResumeAt").apply()
-                }
-            } catch (e: Exception) {
-                prefs.edit().remove("uploadResumeAt").apply()
-            }
+        if (UploadAllowance.isResumeWindowActive(applicationContext)) {
+            FileLogger.w("SyncWorker", "Uploads are blocked until ${UploadAllowance.storedResumeAt(applicationContext)}")
+            return Result.success() // Wait for next scheduled sync
         }
 
         try {
@@ -302,33 +284,13 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 try {
                     val json = JSONObject(errorMsg)
                     if (json.optString("code") == "UPLOAD_ALLOWANCE_EXHAUSTED") {
-                        val data = json.optJSONObject("data")
-                        if (data != null && data.optBoolean("uploadsEnabled") == false) {
-                            val resumeAt = if (data.has("uploadResumeAt")) data.getString("uploadResumeAt") else null
-                            if (!resumeAt.isNullOrEmpty()) {
-                                applicationContext.getSharedPreferences("UploadPrefs", Context.MODE_PRIVATE)
-                                    .edit().putString("uploadResumeAt", resumeAt).apply()
-                                
-                                try {
-                                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                                    isoFormat.timeZone = TimeZone.getTimeZone("UTC")
-                                    val date = isoFormat.parse(resumeAt)
-                                    if (date != null) {
-                                        val localFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
-                                        localFormat.timeZone = TimeZone.getDefault()
-                                        val localTime = localFormat.format(date)
-                                        notifyUserVisibleFailure(
-                                            title = "Upload allowance exhausted",
-                                            message = "You can upload after $localTime"
-                                        )
-                                    }
-                                } catch (e: Exception) {}
-                            } else {
-                                notifyUserVisibleFailure(
-                                    title = "Upload allowance exhausted",
-                                    message = "Uploads are used up for this period."
-                                )
-                            }
+                        val status = UploadAllowance.parse(errorMsg)
+                        if (status.uploadsEnabled != true) {
+                            UploadAllowance.saveResumeAt(applicationContext, status.uploadResumeAt)
+                            notifyUserVisibleFailure(
+                                title = "Upload allowance exhausted",
+                                message = UploadAllowance.blockedMessage(status.uploadResumeAt)
+                            )
                         }
                     }
                 } catch (e: Exception) {

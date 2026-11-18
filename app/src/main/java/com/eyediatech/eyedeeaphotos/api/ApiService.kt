@@ -40,6 +40,12 @@ interface ApiService {
         @Path("householdId") householdId: String
     ): Response<okhttp3.ResponseBody>
 
+    @GET("/api/v1/households/{householdId}/members")
+    suspend fun getHouseholdMembers(
+        @Header("Authorization") token: String,
+        @Path("householdId") householdId: String
+    ): Response<okhttp3.ResponseBody>
+
     @Multipart
     @POST("/api/v1/{householdId}/sources/{sourceId}/browse/upload")
     suspend fun uploadPhotos(
