@@ -66,7 +66,7 @@ android {
 
     defaultConfig {
         applicationId = "com.eyediatech.eyedeeaphotos"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 36
         versionCode = 18
         versionName = "1.17"
