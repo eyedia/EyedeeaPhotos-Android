@@ -42,9 +42,13 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import android.os.Handler
+import android.os.Looper
 import android.view.Menu
 import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
 
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
@@ -67,6 +71,56 @@ class MainActivity : AppCompatActivity() {
     private var queueBadge: TextView? = null
     private var settingsActionBadge: TextView? = null
     private val storagePermissionRequestCode = 1001
+
+    private val CAST_NAMESPACE = "urn:x-cast:com.eyediatech.eyedeeaphotos"
+    private var castSession: CastSession? = null
+
+    private val castSessionManagerListener = object : SessionManagerListener<CastSession> {
+        override fun onSessionStarted(session: CastSession, sessionId: String) {
+            castSession = session
+            sendAuthTokenToCast()
+        }
+        override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+            castSession = session
+            sendAuthTokenToCast()
+        }
+        override fun onSessionEnded(session: CastSession, error: Int) { castSession = null }
+        override fun onSessionSuspended(session: CastSession, reason: Int) { castSession = null }
+        override fun onSessionStarting(session: CastSession) {}
+        override fun onSessionStartFailed(session: CastSession, error: Int) {}
+        override fun onSessionResuming(session: CastSession, sessionId: String) {}
+        override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+        override fun onSessionEnding(session: CastSession) {}
+    }
+
+    private fun sendAuthTokenToCast() {
+        val token = authRepository.getToken() ?: return
+        val userJsonRaw = authRepository.getUserJson() ?: "{}"
+        val role = authRepository.getGroup() ?: "user"
+        val refreshToken = authRepository.getRefreshToken() ?: ""
+        
+        // Always force the TV to load /view, as that is the intended cast target surface
+        val targetUrl = "https://www.eyedeeaphotos.com/view"
+        
+        try {
+            val payload = JSONObject().apply {
+                put("type", "AUTH")
+                put("token", token)
+                put("refresh_token", refreshToken)
+                put("user", JSONObject(userJsonRaw))
+                put("role", role)
+                put("targetUrl", targetUrl)
+            }.toString()
+
+            // When a session is resumed or just started, it might take a split second for the custom channel to be fully ready.
+            // Send the message immediately, and also queue it to fire again after 1 second just in case.
+            castSession?.sendMessage(CAST_NAMESPACE, payload)
+            
+            Log.d("CAST_DEBUG", "Sent auth payload to cast receiver. Target URL: $targetUrl")
+        } catch (e: Exception) {
+            Log.e("CAST_DEBUG", "Failed to send auth token to cast", e)
+        }
+    }
 
     private val pickImagesLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) {
@@ -376,7 +430,16 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize CastContext
         try {
-            CastContext.getSharedInstance(this)
+            val castContext = CastContext.getSharedInstance(this)
+            // Ensure the session listener is attached immediately
+            castContext.sessionManager.addSessionManagerListener(
+                castSessionManagerListener, CastSession::class.java
+            )
+            // If a session is already active (e.g. recreated activity), send token
+            castContext.sessionManager.currentCastSession?.let { session ->
+                castSession = session
+                sendAuthTokenToCast()
+            }
         } catch (e: Exception) {
             Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
         }
@@ -446,7 +509,16 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         // Initialize CastContext
         try {
-            CastContext.getSharedInstance(this)
+            val castContext = CastContext.getSharedInstance(this)
+            // Ensure the session listener is attached immediately
+            castContext.sessionManager.addSessionManagerListener(
+                castSessionManagerListener, CastSession::class.java
+            )
+            // If a session is already active (e.g. recreated activity), send token
+            castContext.sessionManager.currentCastSession?.let { session ->
+                castSession = session
+                sendAuthTokenToCast()
+            }
         } catch (e: Exception) {
             Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
         }
@@ -456,17 +528,6 @@ class MainActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
 
         handleUploadDeepLink(intent?.data)
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        super.onCreateOptionsMenu(menu)
-        menuInflater.inflate(R.menu.cast_menu, menu)
-        CastButtonFactory.setUpMediaRouteButton(
-            applicationContext,
-            menu,
-            R.id.media_route_menu_item
-        )
-        return true
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -484,6 +545,18 @@ class MainActivity : AppCompatActivity() {
                 startService(serviceIntent)
             }
         }
+
+        try {
+            val castContext = CastContext.getSharedInstance(this)
+            castContext.sessionManager.addSessionManagerListener(
+                castSessionManagerListener, CastSession::class.java
+            )
+            // Removed the redundant "sendAuthTokenToCast" call here, because 
+            // when the user unlocks the phone and onResume fires, we don't want it 
+            // spamming the TV and causing the iframe to reload/flicker if they are already connected.
+        } catch (e: Exception) {
+            Log.e("CAST_DEBUG", "Failed to add cast session listener", e)
+        }
         
         // Refresh the stored allowance without a dialog. The dialog is shown when upload is tapped.
         checkUploadAllowanceAndProceed(announce = false) {}
@@ -496,6 +569,14 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         val serviceIntent = Intent(this, KeepAwakeService::class.java)
         stopService(serviceIntent)
+        
+        try {
+            CastContext.getSharedInstance(this).sessionManager.removeSessionManagerListener(
+                castSessionManagerListener, CastSession::class.java
+            )
+        } catch (e: Exception) {
+            Log.e("CAST_DEBUG", "Failed to remove cast session listener", e)
+        }
         // Do not call webView.onPause() — avoids aggressive refresh when returning from lock.
     }
 
