@@ -177,6 +177,10 @@ dependencies {
     // Swipe Refresh
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
+    // Google Cast
+    implementation("com.google.android.gms:play-services-cast-framework:23.0.0")
+    implementation("androidx.mediarouter:mediarouter:1.7.0") // Using standard stable version
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

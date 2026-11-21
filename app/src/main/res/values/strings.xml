@@ -46,4 +46,8 @@
     <string name="unsupported_files_ignored">Unsupported files ignored</string>
     <string name="unsupported_files_ignored_message">Only photos are supported and will be queued for upload.</string>
     <string name="please_log_in_first">Please log in first</string>
+    <!-- Cast -->
+    <!-- Replace this with your actual Custom Web Receiver App ID once generated in Google Cast Console -->
+    <string name="cast_app_id">6D28D1F5</string> <!-- Default Receiver for initial setup, requires replace for custom -->
+    <string name="cast">Cast</string>
 </resources>

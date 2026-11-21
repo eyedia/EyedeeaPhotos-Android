@@ -42,7 +42,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-
+import android.view.Menu
+import com.google.android.gms.cast.framework.CastButtonFactory
+import com.google.android.gms.cast.framework.CastContext
 
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
@@ -372,7 +374,29 @@ class MainActivity : AppCompatActivity() {
             handleLoadError()
         }
 
+        // Initialize CastContext
+        try {
+            CastContext.getSharedInstance(this)
+        } catch (e: Exception) {
+            Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
+        }
+        
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
         handleUploadDeepLink(intent?.data)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        super.onCreateOptionsMenu(menu)
+        menuInflater.inflate(R.menu.cast_menu, menu)
+        CastButtonFactory.setUpMediaRouteButton(
+            applicationContext,
+            menu,
+            R.id.media_route_menu_item
+        )
+        return true
     }
 
     /** Default home for the role, or the last in-app URL if we have one. */
@@ -420,7 +444,29 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // Initialize CastContext
+        try {
+            CastContext.getSharedInstance(this)
+        } catch (e: Exception) {
+            Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
+        }
+        
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
         handleUploadDeepLink(intent?.data)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        super.onCreateOptionsMenu(menu)
+        menuInflater.inflate(R.menu.cast_menu, menu)
+        CastButtonFactory.setUpMediaRouteButton(
+            applicationContext,
+            menu,
+            R.id.media_route_menu_item
+        )
+        return true
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
