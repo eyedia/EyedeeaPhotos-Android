@@ -78,11 +78,13 @@ class MainActivity : AppCompatActivity() {
     private val castSessionManagerListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarted(session: CastSession, sessionId: String) {
             castSession = session
-            sendAuthTokenToCast()
+            sendAuthTokenToCast() // Only send data when the session is FIRST established
         }
         override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
             castSession = session
-            sendAuthTokenToCast()
+            // INTENTIONALLY NOT SENDING AUTH TOKEN HERE. 
+            // If the user backgrounds the app and re-enters, the Cast session "resumes" on the phone,
+            // but the TV is already happily casting. Sending the token again forces the TV to reload the webpage.
         }
         override fun onSessionEnded(session: CastSession, error: Int) { castSession = null }
         override fun onSessionSuspended(session: CastSession, reason: Int) { castSession = null }
@@ -113,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             }.toString()
 
             // When a session is resumed or just started, it might take a split second for the custom channel to be fully ready.
-            // Send the message immediately, and also queue it to fire again after 1 second just in case.
+            // Only send the payload if we are actually viewing the page on our phone that we want to cast
             castSession?.sendMessage(CAST_NAMESPACE, payload)
             
             Log.d("CAST_DEBUG", "Sent auth payload to cast receiver. Target URL: $targetUrl")
@@ -435,11 +437,15 @@ class MainActivity : AppCompatActivity() {
             castContext.sessionManager.addSessionManagerListener(
                 castSessionManagerListener, CastSession::class.java
             )
-            // If a session is already active (e.g. recreated activity), send token
+            // If a session is already active (e.g. recreated activity), register it without resending token
             castContext.sessionManager.currentCastSession?.let { session ->
                 castSession = session
-                sendAuthTokenToCast()
             }
+            
+            // Set up the custom Cast button in the pop-up menu
+            val customCastButton = findViewById<androidx.mediarouter.app.MediaRouteButton>(R.id.custom_cast_button)
+            CastButtonFactory.setUpMediaRouteButton(applicationContext, customCastButton)
+            
         } catch (e: Exception) {
             Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
         }
@@ -514,11 +520,15 @@ class MainActivity : AppCompatActivity() {
             castContext.sessionManager.addSessionManagerListener(
                 castSessionManagerListener, CastSession::class.java
             )
-            // If a session is already active (e.g. recreated activity), send token
+            // If a session is already active (e.g. recreated activity), register it without resending token
             castContext.sessionManager.currentCastSession?.let { session ->
                 castSession = session
-                sendAuthTokenToCast()
             }
+            
+            // Set up the custom Cast button in the pop-up menu
+            val customCastButton = findViewById<androidx.mediarouter.app.MediaRouteButton>(R.id.custom_cast_button)
+            CastButtonFactory.setUpMediaRouteButton(applicationContext, customCastButton)
+
         } catch (e: Exception) {
             Log.e("CAST_DEBUG", "Failed to initialize CastContext", e)
         }
@@ -551,9 +561,10 @@ class MainActivity : AppCompatActivity() {
             castContext.sessionManager.addSessionManagerListener(
                 castSessionManagerListener, CastSession::class.java
             )
-            // Removed the redundant "sendAuthTokenToCast" call here, because 
-            // when the user unlocks the phone and onResume fires, we don't want it 
-            // spamming the TV and causing the iframe to reload/flicker if they are already connected.
+            // Safety check: ensure we hold the session reference, but DO NOT re-send auth payload here.
+            castContext.sessionManager.currentCastSession?.let { session ->
+                castSession = session
+            }
         } catch (e: Exception) {
             Log.e("CAST_DEBUG", "Failed to add cast session listener", e)
         }

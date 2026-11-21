@@ -18,13 +18,12 @@
 
     </com.eyediatech.eyedeeaphotos.ui.WebViewSwipeRefreshLayout>
 
+    <!-- Hidden toolbar specifically for MediaRouteActionProvider to inflate into -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@android:color/transparent"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -86,6 +85,22 @@
                 tools:text="1"
                 tools:visibility="visible" />
         </FrameLayout>
+
+        <!-- New Cast Button in the Settings Menu -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <androidx.mediarouter.app.MediaRouteButton
+                android:id="@+id/custom_cast_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="12dp"
+                android:padding="12dp"
+                android:background="@drawable/circle_avatar_bg"
+                android:backgroundTint="#80000000" />
+        </FrameLayout>
+
     </LinearLayout>
 
     <FrameLayout
